@@ -1,0 +1,16 @@
+{
+  "id": "./",
+  "name": "報修登記",
+  "short_name": "報修登記",
+  "description": "登記問題並查看最近報修；新增與清單讀取需要網路連線。",
+  "lang": "zh-Hant",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f6f4",
+  "theme_color": "#155e59",
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

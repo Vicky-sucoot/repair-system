@@ -9,6 +9,9 @@ h2 { margin: 0 0 8px; font-size: 1.3rem; }
 p { margin: 8px 0; }
 .panel { background: white; border: 1px solid #d9e5df; border-radius: 20px; padding: 28px; margin-bottom: 24px; box-shadow: 0 8px 32px #19343006; }
 .hint, footer { color: #526b63; font-size: .9rem; }
+summary { cursor: pointer; min-height: 44px; padding: 10px 0; font-weight: 650; }
+[hidden] { display: none !important; }
+a { color: #155e59; text-underline-offset: 3px; }
 form { margin-top: 24px; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 label { display: block; font-weight: 650; margin-bottom: 18px; }
