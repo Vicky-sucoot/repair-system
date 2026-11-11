@@ -44,6 +44,10 @@ function renderRequests(rows) {
 
 async function loadRequests() {
   if (loading) return;
+  if (!navigator.onLine) {
+    message(listMessage, '目前離線，無法更新清單；若下方有資料，僅為本次開啟時讀取的舊資料。', 'error');
+    return;
+  }
   loading = true;
   refreshButton.disabled = true;
   list.setAttribute('aria-busy', 'true');
@@ -61,7 +65,7 @@ async function loadRequests() {
     message(listMessage, `無法更新清單，請稍後按重新整理。${list.children.length ? '下方保留上次載入的資料。' : ''}（${error.message || '連線失敗'}）`, 'error');
   } finally {
     loading = false;
-    refreshButton.disabled = false;
+    refreshButton.disabled = !navigator.onLine;
     list.setAttribute('aria-busy', 'false');
   }
 }
@@ -90,6 +94,10 @@ for (const button of filterButtons) {
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (!navigator.onLine) {
+    message(formMessage, '目前離線，尚未送出；請連線後再操作，本機不會暫存或自動補送。', 'error');
+    return;
+  }
   if (!client || submitting || !form.reportValidity()) return;
   const values = new FormData(form);
   // 明確列出可新增欄位，不傳送 status、id 或 created_at。
@@ -114,19 +122,31 @@ form.addEventListener('submit', async (event) => {
     message(formMessage, `未能確認送出成功，輸入內容已保留；請先查看清單再決定是否重試，避免重複登記。（${error.message || '連線失敗'}）`, 'error');
   } finally {
     submitting = false;
-    submitButton.disabled = false;
+    submitButton.disabled = !navigator.onLine;
     submitButton.textContent = '送出報修';
   }
 });
 
 refreshButton.addEventListener('click', loadRequests);
+function updateConnection() {
+  submitButton.disabled = !client || submitting || !navigator.onLine;
+  refreshButton.disabled = !client || loading || !navigator.onLine;
+  if (!navigator.onLine) {
+    message(listMessage, '目前離線，無法更新清單；若下方有資料，僅為本次開啟時讀取的舊資料。', 'error');
+  }
+}
+window.addEventListener('offline', updateConnection);
+window.addEventListener('online', () => {
+  updateConnection();
+  if (client) loadRequests();
+});
 try {
   const config = window.REPAIR_CONFIG;
   if (!window.supabase?.createClient || !config?.url || !config?.publishableKey) throw new Error('連線設定或 Supabase 程式庫未載入，請重新整理頁面。');
   client = window.supabase.createClient(config.url, config.publishableKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
   });
-  submitButton.disabled = false;
+  updateConnection();
   loadRequests();
 } catch (error) {
   message(formMessage, error.message, 'error');
