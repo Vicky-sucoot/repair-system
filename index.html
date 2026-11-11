@@ -31,7 +31,15 @@
     </section>
     <section class="panel" aria-labelledby="list-title">
       <div class="section-heading"><div><h2 id="list-title">最近報修</h2><p class="hint">最近 20 筆 · 最新的在上方</p></div><button id="refresh-button" class="secondary" type="button" disabled>重新整理</button></div>
+      <div class="filters" role="group" aria-label="依緊急程度篩選">
+        <button type="button" data-urgency="全部" aria-pressed="true">全部</button>
+        <button type="button" data-urgency="高" aria-pressed="false">高</button>
+        <button type="button" data-urgency="中" aria-pressed="false">中</button>
+        <button type="button" data-urgency="低" aria-pressed="false">低</button>
+      </div>
+      <p class="hint">篩選範圍僅限已載入的最近 20 筆。</p>
       <p id="list-message" role="status" aria-live="polite">準備載入清單…</p>
+      <p id="filter-message" role="status" aria-live="polite"></p>
       <ol id="request-list" aria-label="最近報修清單"></ol>
     </section>
     <footer>一起讓工作環境更好。</footer>
