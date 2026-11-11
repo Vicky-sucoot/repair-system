@@ -6,6 +6,11 @@ const refreshButton = document.querySelector('#refresh-button');
 const formMessage = document.querySelector('#form-message');
 const listMessage = document.querySelector('#list-message');
 const list = document.querySelector('#request-list');
+const filterMessage = document.querySelector('#filter-message');
+const filterButtons = document.querySelectorAll('[data-urgency]');
+let cachedRequests = [];
+let selectedUrgency = '全部';
+let hasLoaded = false;
 let client;
 let submitting = false;
 let loading = false;
@@ -48,7 +53,9 @@ async function loadRequests() {
       .select('id,created_at,reporter_name,location,category,description,urgency,status')
       .order('created_at', { ascending: false }).order('id', { ascending: false }).limit(20);
     if (error) throw error;
-    renderRequests(data || []);
+    cachedRequests = data || [];
+    hasLoaded = true;
+    applyFilter();
     message(listMessage, data?.length ? `已顯示最近 ${data.length} 筆報修。` : '目前沒有報修紀錄。');
   } catch (error) {
     message(listMessage, `無法更新清單，請稍後按重新整理。${list.children.length ? '下方保留上次載入的資料。' : ''}（${error.message || '連線失敗'}）`, 'error');
@@ -57,6 +64,28 @@ async function loadRequests() {
     refreshButton.disabled = false;
     list.setAttribute('aria-busy', 'false');
   }
+}
+
+// 篩選僅處理已讀取的最近 20 筆資料，不發出額外資料庫請求。
+function applyFilter() {
+  for (const button of filterButtons) {
+    button.setAttribute('aria-pressed', String(button.dataset.urgency === selectedUrgency));
+  }
+  if (!hasLoaded) return;
+  const rows = selectedUrgency === '全部'
+    ? cachedRequests
+    : cachedRequests.filter(row => row.urgency === selectedUrgency);
+  renderRequests(rows);
+  message(filterMessage, rows.length
+    ? `目前篩選：${selectedUrgency}，顯示 ${rows.length} 筆。`
+    : `已載入的清單中沒有${selectedUrgency === '全部' ? '' : `緊急程度為「${selectedUrgency}」的`}報修紀錄。`);
+}
+
+for (const button of filterButtons) {
+  button.addEventListener('click', () => {
+    selectedUrgency = button.dataset.urgency;
+    applyFilter();
+  });
 }
 
 form.addEventListener('submit', async (event) => {
