@@ -1,4 +1,4 @@
-// 定期定額試算核心：純函式，不存取 DOM 或網路，瀏覽器與測試共用。
+// 定期不定額試算核心：純函式，不存取 DOM 或網路，瀏覽器與測試共用。
 
 /** 可選的標的；currency 為該標的的交易幣別。 */
 export const ASSETS = Object.freeze({
@@ -14,15 +14,6 @@ export const MARKET_DEFAULTS = Object.freeze({
   TW: { feeRate: 0.1425, minFee: 1, wholeShares: true, dividendTax: 0 },
   US: { feeRate: 0, minFee: 0, wholeShares: false, dividendTax: 30 }
 });
-
-/** 'YYYY-MM-DD' 字串可直接以字典序比較。 */
-export function toDateString(year, month, day) {
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
-
-function daysInMonth(year, month) {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate();
-}
 
 /** 回傳第一個日期 >= date 的索引；若都早於 date 則回傳 dates.length。 */
 export function indexOnOrAfter(dates, date) {
@@ -40,29 +31,6 @@ export function valueOnOrBefore(series, date) {
   const index = indexOnOrAfter(series.dates, date);
   if (index < series.dates.length && series.dates[index] === date) return series.close[index];
   return series.close[Math.max(0, index - 1)];
-}
-
-/**
- * 列出每月扣款日（遇假日順延至下一個交易日）。
- * 只包含開始日（含）之後、且資料範圍內已發生的扣款。
- */
-export function monthlyDebitDates(dates, startDate, day) {
-  if (!dates.length) return [];
-  const result = [];
-  const last = dates[dates.length - 1];
-  let year = Number(startDate.slice(0, 4));
-  let month = Number(startDate.slice(5, 7));
-  for (;;) {
-    const target = toDateString(year, month, Math.min(day, daysInMonth(year, month)));
-    if (target > last) break;
-    if (target >= startDate) {
-      const index = indexOnOrAfter(dates, target);
-      if (index < dates.length) result.push(dates[index]);
-    }
-    month += 1;
-    if (month > 12) { month = 1; year += 1; }
-  }
-  return result;
 }
 
 /** 依手續費與整股設定，計算一筆買進；金額皆為標的幣別。 */
@@ -103,10 +71,11 @@ export function xirr(flows) {
 }
 
 /**
- * 模擬一個定期定額方案。
- * @param plan { symbol, startDate, initial, monthly, day, feeRate(%), minFee(TWD), wholeShares, reinvest, dividendTax(%) }
+ * 模擬一個定期不定額方案：原始投入一次買進，之後每筆手動輸入的金額各自買進（累積）。
+ * @param plan { symbol, startDate, initial, entries: [{ id, date, amount }], feeRate(%), minFee(TWD), wholeShares, reinvest, dividendTax(%) }
  * @param series { dates, close, dividends: [[date, perShare]] } 標的的日收盤價
  * @param fx 美元兌新台幣日資料，台股可省略
+ * 每筆投入以當日（遇假日順延至下一個交易日）收盤價成交；日期晚於最新股價者列為待成交。
  * 所有 *TWD 結果皆換算為新台幣。
  */
 export function simulate(plan, series, fx = null) {
@@ -119,26 +88,28 @@ export function simulate(plan, series, fx = null) {
   const rateAt = date => (needsFx ? valueOnOrBefore(fx, date) : 1);
   const lastDate = dates[dates.length - 1];
 
-  // 建立依日期排序的事件；同一天先除息（當天買進不參與配息），再買進。
+  // 建立依日期排序的事件；同一天先除息（當天買進不參與配息），再買進，最後記錄走勢。
+  const contributions = [];
+  if (plan.initial > 0 && plan.startDate) contributions.push({ id: 'initial', date: plan.startDate, amount: plan.initial, type: '原始投入' });
+  for (const entry of plan.entries || []) {
+    if (entry.amount > 0 && entry.date) contributions.push({ ...entry, type: '每月投入' });
+  }
+  const pending = contributions.filter(c => indexOnOrAfter(dates, c.date) >= dates.length);
   const events = [];
-  const startIndex = indexOnOrAfter(dates, plan.startDate);
-  if (plan.initial > 0 && startIndex < dates.length) {
-    events.push({ date: dates[startIndex], order: 1, kind: 'initial', amount: plan.initial });
+  for (const c of contributions) {
+    const index = indexOnOrAfter(dates, c.date);
+    if (index < dates.length) events.push({ date: dates[index], order: 1, kind: 'buy', contribution: c });
   }
-  if (plan.monthly > 0) {
-    for (const date of monthlyDebitDates(dates, plan.startDate, plan.day)) {
-      events.push({ date, order: 1, kind: 'monthly', amount: plan.monthly });
-    }
-  }
+  const firstDate = events.reduce((min, e) => (e.date < min ? e.date : min), '9999-12-31');
   for (const [exDate, perShare] of series.dividends || []) {
-    if (exDate < plan.startDate || exDate > lastDate || !(perShare > 0)) continue;
+    if (exDate < firstDate || exDate > lastDate || !(perShare > 0)) continue;
     const index = indexOnOrAfter(dates, exDate);
     if (index < dates.length) events.push({ date: dates[index], order: 0, kind: 'dividend', perShare });
   }
   // 每月最後一個交易日記錄一次資產走勢，最後一天一定記錄。
-  for (let i = 0; i < dates.length; i += 1) {
+  for (let i = indexOnOrAfter(dates, firstDate); i < dates.length; i += 1) {
     const isMonthEnd = i === dates.length - 1 || dates[i + 1].slice(0, 7) !== dates[i].slice(0, 7);
-    if (isMonthEnd && dates[i] >= plan.startDate) events.push({ date: dates[i], order: 2, kind: 'snapshot', index: i });
+    if (isMonthEnd) events.push({ date: dates[i], order: 2, kind: 'snapshot', index: i });
   }
   events.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.order - b.order));
 
@@ -152,7 +123,7 @@ export function simulate(plan, series, fx = null) {
   let cashTWD = 0;
   let dividendsTWD = 0;
 
-  const execute = (date, budgetTWD, type) => {
+  const execute = (date, budgetTWD, type, id = null) => {
     const index = indexOnOrAfter(dates, date);
     const price = close[index];
     const rate = rateAt(date);
@@ -160,24 +131,28 @@ export function simulate(plan, series, fx = null) {
     const costTWD = (result.gross + result.fee) * rate;
     shares += result.shares;
     feesTWD += result.fee * rate;
-    transactions.push({ date, type, price, rate, shares: result.shares, feeTWD: result.fee * rate, costTWD, sharesAfter: shares });
-    return costTWD;
+    const tx = { id, date, type, amountTWD: budgetTWD, price, rate, shares: result.shares, feeTWD: result.fee * rate, costTWD, sharesAfter: shares };
+    transactions.push(tx);
+    return tx;
   };
 
   for (const event of events) {
-    if (event.kind === 'initial' || event.kind === 'monthly') {
-      const cost = execute(event.date, event.amount, event.kind === 'initial' ? '單筆投入' : '定期定額');
-      investedTWD += cost;
-      if (cost > 0) flows.push({ date: event.date, amount: -cost });
+    if (event.kind === 'buy') {
+      const c = event.contribution;
+      const tx = execute(event.date, c.amount, c.type, c.id);
+      investedTWD += tx.costTWD;
+      tx.investedAfter = investedTWD;
+      tx.requestedDate = c.date;
+      if (tx.costTWD > 0) flows.push({ date: event.date, amount: -tx.costTWD });
     } else if (event.kind === 'dividend') {
       if (shares <= 0) continue;
       const net = shares * event.perShare * (1 - plan.dividendTax / 100);
       const netTWD = net * rateAt(event.date);
       dividendsTWD += netTWD;
-      transactions.push({ date: event.date, type: '配息', price: event.perShare, rate: rateAt(event.date), shares: 0, feeTWD: 0, costTWD: -netTWD, sharesAfter: shares });
+      transactions.push({ id: null, date: event.date, type: '配息', amountTWD: netTWD, price: event.perShare, rate: rateAt(event.date), shares: 0, feeTWD: 0, costTWD: -netTWD, sharesAfter: shares });
       if (plan.reinvest) {
-        const cost = execute(event.date, netTWD, '股息再投入');
-        cashTWD += netTWD - cost;
+        const tx = execute(event.date, netTWD, '股息再投入');
+        cashTWD += netTWD - tx.costTWD;
       } else {
         cashTWD += netTWD;
       }
@@ -201,6 +176,8 @@ export function simulate(plan, series, fx = null) {
     rate: rateNow,
     currency: asset.currency,
     investedTWD,
+    pendingTWD: pending.reduce((sum, c) => sum + c.amount, 0),
+    pending,
     feesTWD,
     marketValueTWD,
     cashTWD,

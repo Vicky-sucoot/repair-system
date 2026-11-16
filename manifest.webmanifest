@@ -2,7 +2,7 @@
   "id": "./",
   "name": "定期定額",
   "short_name": "定期定額",
-  "description": "輸入原始投入與每月定期定額金額，依網路股價自動計算庫存與獲利。",
+  "description": "定期不定額：每月手動輸入投入金額，依網路股價自動累積計算庫存與獲利。",
   "lang": "zh-Hant",
   "start_url": "./index.html",
   "scope": "./",

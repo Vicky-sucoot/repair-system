@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#155e59">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="定期定額">
-  <meta name="description" content="0050 與 S&P 500 定期定額試算：輸入原始投入與每月金額，依網路股價自動計算庫存與獲利。">
+  <meta name="description" content="0050 與 S&P 500 定期不定額紀錄：每月手動輸入投入金額，依網路股價自動累積計算庫存與獲利。">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" href="./icons/icon-192.png">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
@@ -19,8 +19,8 @@
   <main>
     <header>
       <span class="eyebrow">DCA TRACKER</span>
-      <h1>0050 × S&amp;P 500 定期定額</h1>
-      <p>輸入原始投入與每月扣款金額，依網路股價自動計算庫存、市值與獲利（新台幣）。</p>
+      <h1>0050 × S&amp;P 500 定期不定額</h1>
+      <p>設定原始投入後，每月手動輸入當月投入金額並送出，依網路股價自動累積計算庫存、市值與獲利（新台幣）。</p>
     </header>
 
     <section class="panel market" aria-labelledby="market-title">
@@ -49,27 +49,28 @@
     <section class="panel">
       <h2>計算方式</h2>
       <ul class="notes">
-        <li>原始投入於開始日（遇假日順延）一次買進；每月於扣款日買進，遇假日順延至下一個交易日，皆以當日收盤價成交。</li>
+        <li>原始投入於原始投入日期一次買進；每月投入依輸入的日期買進，遇假日順延至下一個交易日，皆以當日收盤價成交。每筆投入會累積到庫存中。</li>
+        <li>投入日期晚於最新股價日期（例如今天尚未收盤）時列為「待成交」，等股價更新後自動計入。</li>
         <li>台股預設整股（零股）買進，未用完的金額不扣款；手續費＝成交金額 × 費率，不足最低手續費以最低計。</li>
-        <li>VOO 以扣款當日美元匯率換算新台幣，預設可買碎股、股息預扣 30% 稅；市值以最新匯率換算。</li>
+        <li>VOO 以投入當日美元匯率換算新台幣，預設可買碎股、股息預扣 30% 稅；市值以最新匯率換算。</li>
         <li>配息依除息日持股計算；勾選「股息再投入」會於除息日買進，否則列為已領現金，並計入總報酬。</li>
         <li>股價與配息來自 Yahoo Finance，每個交易日由 GitHub Actions 自動更新。試算結果僅供參考，不構成投資建議，實際成交以券商對帳單為準。</li>
       </ul>
     </section>
-    <footer>設定只儲存在這台裝置的瀏覽器中。</footer>
+    <footer>設定與投入紀錄只儲存在這台裝置的瀏覽器中；換手機或清除瀏覽資料會遺失。</footer>
   </main>
 
   <template id="plan-template">
     <section class="panel plan">
       <div class="section-heading"><h2 class="plan-title"></h2><span class="badge plan-currency"></span></div>
+
+      <h3>基本設定</h3>
       <form class="plan-form">
         <fieldset class="plan-fields">
         <div class="grid">
           <label>投資標的<select name="symbol"></select></label>
-          <label>開始日期<input name="startDate" type="date" required min="2003-07-01"></label>
-          <label>原始投入金額（新台幣）<input name="initial" type="number" required inputmode="numeric" min="0" step="1000"></label>
-          <label>每月定期定額（新台幣）<input name="monthly" type="number" required inputmode="numeric" min="0" step="1000"></label>
-          <label>每月扣款日<input name="day" type="number" required inputmode="numeric" min="1" max="31" step="1"></label>
+          <label>原始投入日期<input name="startDate" type="date" required min="2009-01-01"></label>
+          <label>原始投入金額（新台幣）<input name="initial" type="number" required inputmode="numeric" min="0" step="1"></label>
           <label>手續費率（%）<input name="feeRate" type="number" required inputmode="decimal" min="0" max="5" step="0.0001"></label>
           <label>最低手續費（新台幣）<input name="minFee" type="number" required inputmode="decimal" min="0" step="1"></label>
           <label>股息預扣稅（%）<input name="dividendTax" type="number" required inputmode="decimal" min="0" max="100" step="1"></label>
@@ -80,14 +81,31 @@
         </div>
         </fieldset>
       </form>
-      <p class="plan-message" role="status" aria-live="polite"></p>
-      <div class="tiles plan-tiles"></div>
       <div class="plan-actions">
         <button type="button" class="edit-button secondary">修改</button>
         <button type="submit" class="submit-button">送出</button>
         <span class="edit-status hint" role="status" aria-live="polite"></span>
       </div>
-      <details><summary>交易紀錄</summary><div class="table-wrap"><table class="tx-table"></table></div></details>
+
+      <h3>每月投入</h3>
+      <form class="entry-form">
+        <div class="entry-grid">
+          <label>投入日期<input name="date" type="date" required min="2009-01-01"></label>
+          <label>投入金額（新台幣）<input name="amount" type="number" required inputmode="numeric" min="1" step="1" placeholder="例如 8000"></label>
+          <div class="entry-buttons">
+            <button type="submit" class="entry-submit">送出</button>
+            <button type="button" class="secondary entry-cancel" hidden>取消修改</button>
+          </div>
+        </div>
+        <p class="entry-status hint" role="status" aria-live="polite"></p>
+      </form>
+
+      <p class="plan-message" role="status" aria-live="polite"></p>
+      <div class="tiles plan-tiles"></div>
+
+      <h3>投入紀錄（累積）</h3>
+      <div class="table-wrap"><table class="entry-table"></table></div>
+      <details><summary>交易紀錄（含配息）</summary><div class="table-wrap"><table class="tx-table"></table></div></details>
     </section>
   </template>
 </body>

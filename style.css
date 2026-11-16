@@ -59,7 +59,7 @@ button:disabled { opacity: .6; cursor: wait; }
 .down .tile-value, .quote-change.down { color: var(--down); }
 
 /* 表單 */
-.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 12px; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 12px; }
 label { display: block; font-weight: 600; font-size: .9rem; }
 input, select { display: block; width: 100%; font: inherit; font-weight: 400; color: inherit; background: var(--surface); border: 1px solid var(--field); border-radius: 9px; padding: 10px; margin-top: 6px; min-height: 44px; }
 .plan-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
@@ -71,6 +71,22 @@ button:disabled { cursor: not-allowed; }
 .checks { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 12px; }
 .check { display: flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 500; }
 .check input { width: 20px; height: 20px; min-height: 0; margin: 0; accent-color: var(--accent); }
+
+/* 每月投入 */
+.plan h3 { margin: 24px 0 4px; font-size: 1.05rem; padding-top: 16px; border-top: 1px solid var(--border); }
+.plan .section-heading + h3 { border-top: 0; padding-top: 0; margin-top: 8px; }
+.entry-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 14px; align-items: end; margin-top: 8px; }
+.entry-buttons { display: flex; gap: 8px; }
+.entry-buttons button { min-width: 96px; }
+.entry-status { min-height: 1.6em; }
+.plan.editing-entry .entry-form { outline: 2px solid var(--accent); outline-offset: 8px; border-radius: 8px; }
+.row-actions { white-space: nowrap; text-align: left !important; font-size: .8rem; }
+.row-actions .link-button:first-child { margin-left: 0; }
+.link-button { min-height: 36px; padding: 4px 10px; background: transparent; color: var(--accent); border: 1px solid var(--border); font-weight: 600; font-size: .85rem; margin-left: 6px; }
+.link-button:hover { background: var(--surface-2); }
+.link-button.danger { color: var(--up); }
+.entry-table th:nth-child(3) { text-align: left; }
+.row-editing td { background: var(--surface-2); }
 
 /* 圖表 */
 .chart-figure { margin: 20px 0 0; position: relative; }
@@ -109,7 +125,7 @@ th { position: sticky; top: 0; background: var(--surface); color: var(--ink-2); 
 .notes { padding-left: 1.2em; color: var(--ink-2); font-size: .9rem; }
 footer { text-align: center; margin-top: 28px; color: var(--ink); } /* 直接位於粉紅底上，用主文字色維持對比 */
 
-@media (max-width: 760px) { .grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 760px) { .grid { grid-template-columns: 1fr 1fr; } .entry-grid { grid-template-columns: 1fr 1fr; } .entry-buttons { grid-column: 1 / -1; } .entry-buttons button { flex: 1; } }
 @media (max-width: 580px) {
   main { padding: 24px 16px; }
   .panel { padding: 18px; border-radius: 14px; }

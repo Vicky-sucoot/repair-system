@@ -2,7 +2,7 @@
 
 // 以網站路徑區隔快取，避免影響同一 GitHub Pages 網域上的其他網站。
 const CACHE_PREFIX = `dca-pwa-${new URL(self.registration.scope).pathname}-`;
-const CACHE_NAME = `${CACHE_PREFIX}v4`;
+const CACHE_NAME = `${CACHE_PREFIX}v5`;
 const ASSETS = ['./', 'index.html', 'style.css', 'pwa.js', 'manifest.webmanifest',
   'src/app.js', 'src/dca.js', 'src/chart.js', 'data/prices.json',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
