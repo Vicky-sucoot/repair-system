@@ -61,6 +61,17 @@ test('原始投入可手動輸入成交價，依該價格換算股數', () => {
   assert.equal(simulate({ ...twPlan, initialPrice: 0 }, series).transactions.find(t => t.id === 'initial').manualPrice, false);
 });
 
+test('每月投入可各自手動輸入成交價', () => {
+  const entries = twPlan.entries.map(e => (e.id === 'b' ? { ...e, price: 100 } : e));
+  const r = simulate({ ...twPlan, entries }, series);
+  const b = r.transactions.find(t => t.id === 'b');
+  assert.equal(b.price, 100);
+  assert.equal(b.manualPrice, true);
+  assert.equal(b.shares, 30); // 3000/100，未輸入時為 3000/120=25
+  assert.equal(r.shares, 145 + 5);
+  assert.equal(r.transactions.find(t => t.id === 'c').manualPrice, false);
+});
+
 test('美元標的的手動成交價以美元計，依當日匯率換算', () => {
   const fx = { dates: ['2024-01-01'], close: [30] };
   const r = simulate({ ...twPlan, symbol: 'VOO', initial: 30000, initialPrice: 50, entries: [], wholeShares: false }, series, fx);
