@@ -1,15 +1,17 @@
 'use strict';
 
-// 以網站路徑區隔快取，避免清除同一 GitHub Pages 網域上的其他應用程式。
-const CACHE_PREFIX = `repair-pwa-${new URL(self.registration.scope).pathname}-`;
+// 以網站路徑區隔快取，避免影響同一 GitHub Pages 網域上的其他網站。
+const CACHE_PREFIX = `dca-pwa-${new URL(self.registration.scope).pathname}-`;
 const CACHE_NAME = `${CACHE_PREFIX}v1`;
-const ASSETS = ['offline.html', 'style.css', 'manifest.webmanifest',
+const ASSETS = ['./', 'index.html', 'style.css', 'pwa.js', 'manifest.webmanifest',
+  'src/app.js', 'src/dca.js', 'src/chart.js', 'data/prices.json',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 const assetURLs = new Set(ASSETS.map(path => new URL(path, self.registration.scope).href));
-const offlineURL = new URL('offline.html', self.registration.scope).href;
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll([...assetURLs])));
+  // 個別快取，資料檔尚未產生時不影響安裝。
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => Promise.all([...assetURLs].map(url => cache.add(url).catch(() => {})))));
+  self.skipWaiting();
 });
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
@@ -19,26 +21,23 @@ self.addEventListener('activate', event => {
     await self.clients.claim();
   })());
 });
+// 網路優先：有網路時永遠取得最新版本與股價，離線時才使用快取。
 self.addEventListener('fetch', event => {
   const request = event.request;
-  // 不處理跨站 Supabase/CDN、任何寫入、文件下載或非白名單資源。
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
-  const home = new URL('index.html', self.registration.scope);
-  if (request.mode === 'navigate' && (url.pathname === home.pathname || url.href === self.registration.scope)) {
-    event.respondWith(fetch(request).catch(() => caches.match(offlineURL)));
-  } else if (assetURLs.has(url.href)) {
-    event.respondWith((async () => {
-      try {
-        const response = await fetch(request);
-        if (response.ok) {
-          const cache = await caches.open(CACHE_NAME);
-          await cache.put(request, response.clone());
-        }
-        return response;
-      } catch {
-        return caches.match(request);
+  url.search = '';
+  if (!assetURLs.has(url.href)) return;
+  event.respondWith((async () => {
+    try {
+      const response = await fetch(request);
+      if (response.ok) {
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(url.href, response.clone());
       }
-    })());
-  }
+      return response;
+    } catch {
+      return (await caches.match(url.href)) || Response.error();
+    }
+  })());
 });

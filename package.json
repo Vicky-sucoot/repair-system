@@ -1,0 +1,14 @@
+{
+  "name": "dca-tracker",
+  "private": true,
+  "type": "module",
+  "description": "0050 與 S&P 500 定期定額試算網站",
+  "scripts": {
+    "test": "node --test",
+    "fetch-prices": "node scripts/fetch-prices.mjs",
+    "serve": "python3 -m http.server 8000"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "報修登記",
-  "short_name": "報修登記",
-  "description": "登記問題並查看最近報修；新增與清單讀取需要網路連線。",
+  "name": "0050 × S&P 500 定期定額",
+  "short_name": "定期定額",
+  "description": "輸入原始投入與每月定期定額金額，依網路股價自動計算庫存與獲利。",
   "lang": "zh-Hant",
   "start_url": "./index.html",
   "scope": "./",

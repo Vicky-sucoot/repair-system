@@ -1,0 +1,42 @@
+name: 更新股價資料
+
+on:
+  schedule:
+    # 台灣時間每週二至週六 07:17（美股收盤後；台股前一日收盤資料亦已更新）
+    - cron: '17 23 * * 1-5'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/fetch-prices.mjs'
+      - 'src/**'
+      - '.github/workflows/update-prices.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-prices
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test
+      - run: node scripts/fetch-prices.mjs
+      - name: 提交更新的資料
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898333+github-actions[bot]@users.noreply.github.com"
+          git add data/prices.json
+          if git diff --cached --quiet; then
+            echo "資料沒有變化"
+          else
+            git commit -m "Update price data"
+            git push
+          fi
