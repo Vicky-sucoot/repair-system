@@ -1,9 +1,9 @@
 :root {
   color-scheme: light;
-  --bg: #ffffff; --surface: #fff1f5; --surface-2: #fde2eb; --border: #f2c4d3; --field: #b98a9a;
+  --bg: #fbdcdc; --surface: #ffffff; --surface-2: #fdf0f0; --border: #efc9c9; --field: #bf9393;
   --ink: #193430; --ink-2: #526b63; --accent: #155e59; --accent-hover: #104b47;
   --up: #b42318; --down: #137333; /* 台灣慣例：漲紅跌綠 */
-  --series-total: #2a78d6; --series-invested: #eb6834; --grid: #f6d9e3;
+  --series-total: #2a78d6; --series-invested: #eb6834; --grid: #f3e3e3;
   font-family: system-ui, -apple-system, "Noto Sans TC", sans-serif; color: var(--ink); background: var(--bg); line-height: 1.6;
 }
 @media (prefers-color-scheme: dark) {
