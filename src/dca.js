@@ -3,8 +3,7 @@
 /** 可選的標的；currency 為該標的的交易幣別。 */
 export const ASSETS = Object.freeze({
   '0050.TW': { name: '元大台灣50', short: '0050', currency: 'TWD', market: 'TW' },
-  'VOO': { name: 'Vanguard S&P 500 ETF', short: 'VOO', currency: 'USD', market: 'US' },
-  '00646.TW': { name: '元大S&P500', short: '00646', currency: 'TWD', market: 'TW' }
+  'VOO': { name: 'Vanguard S&P 500 ETF', short: 'VOO', currency: 'USD', market: 'US' }
 });
 
 /** 美元兌新台幣匯率在資料檔中的代號。 */
