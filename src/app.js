@@ -2,6 +2,7 @@ import { ASSETS, FX_SYMBOL, MARKET_DEFAULTS, simulate, combineTimelines } from '
 import { renderChart } from './chart.js';
 
 const STORAGE_KEY = 'dca-tracker-plans-v2';
+const SELECTED_KEY = 'dca-tracker-selected-plan';
 const LEGACY_KEY = 'dca-tracker-plans-v1';
 const DATA_URL = './data/prices.json';
 const DEFAULT_PLANS = [
@@ -107,6 +108,32 @@ function buildPlans() {
     container.append(card);
   });
   container.querySelectorAll('input[type="date"]').forEach(input => { input.max = todayString(); });
+  setupPlanSelect();
+}
+// 投資項目下拉選單：一次只顯示一個項目的卡片。
+function setupPlanSelect() {
+  const select = $('#plan-select');
+  let selected = 0;
+  try { selected = Number(localStorage.getItem(SELECTED_KEY)) || 0; } catch { /* 忽略 */ }
+  if (!(selected >= 0 && selected < plans.length)) selected = 0;
+  select.replaceChildren(...plans.map((_, i) => new Option('', String(i))));
+  updatePlanOptions();
+  select.value = String(selected);
+  showPlan(selected);
+  select.addEventListener('change', () => {
+    showPlan(Number(select.value));
+    try { localStorage.setItem(SELECTED_KEY, select.value); } catch { /* 忽略 */ }
+  });
+}
+function showPlan(index) {
+  document.querySelectorAll('.plan').forEach(card => { card.hidden = Number(card.dataset.index) !== index; });
+}
+function updatePlanOptions() {
+  const select = $('#plan-select');
+  plans.forEach((plan, i) => {
+    const asset = ASSETS[plan.symbol];
+    if (select.options[i]) select.options[i].textContent = `${asset.short} ${asset.name}`;
+  });
 }
 function fillForm(form, plan) {
   form.elements.symbol.value = plan.symbol;
@@ -170,8 +197,9 @@ function setupEntryForm(index, card) {
     const date = form.elements.date.value;
     const amount = Math.round(Number(form.elements.amount.value));
     if (!(amount > 0)) return;
-    const priceValue = Number(form.elements.price.value);
-    const price = form.elements.price.value !== '' && priceValue > 0 ? priceValue : null;
+    // 每月投入的成交價為必填。
+    const price = Number(form.elements.price.value);
+    if (!(price > 0)) return;
     const plan = plans[index];
     const editingId = editingEntry[index];
     const sameMonth = plan.entries.filter(e => e.id !== editingId && e.date.slice(0, 7) === date.slice(0, 7)).length;
@@ -287,6 +315,7 @@ function renderPlan(index) {
   const asset = ASSETS[plan.symbol];
   const card = document.querySelector(`.plan[data-index="${index}"]`);
   card.querySelector('.plan-title').textContent = `${asset.short} ${asset.name}`;
+  updatePlanOptions();
   card.querySelector('.plan-currency').textContent = asset.currency === 'USD' ? '美元計價・換算新台幣' : '新台幣計價';
   card.querySelector('.entry-price-unit').textContent = asset.currency === 'USD' ? 'US$' : 'NT$';
   const message = card.querySelector('.plan-message');

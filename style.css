@@ -76,6 +76,13 @@ button:disabled { cursor: not-allowed; }
 .check { display: flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 500; }
 .check input { width: 20px; height: 20px; min-height: 0; margin: 0; accent-color: var(--accent); }
 
+/* 投資項目選單 */
+.plan-picker { display: grid; grid-template-columns: auto minmax(0, 360px) 1fr; align-items: center; gap: 8px 16px; padding-top: 20px; padding-bottom: 20px; }
+.plan-picker label { font-size: 1.1rem; font-weight: 700; }
+.plan-picker select { margin-top: 0; font-weight: 600; }
+.plan-picker .hint { margin: 0; }
+@media (max-width: 580px) { .plan-picker { grid-template-columns: 1fr; } }
+
 /* 每月投入 */
 .plan h3 { margin: 24px 0 4px; font-size: 1.05rem; padding-top: 16px; border-top: 1px solid var(--border); }
 .plan .section-heading + h3 { border-top: 0; padding-top: 0; margin-top: 8px; }
