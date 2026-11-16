@@ -28,7 +28,7 @@
         <div><h2 id="market-title">最新行情</h2><p id="data-status" class="hint" role="status" aria-live="polite">讀取股價資料中…</p></div>
         <button id="reload-button" class="secondary" type="button">重新讀取</button>
       </div>
-      <ul id="quotes" class="quotes" aria-label="最新收盤價"></ul>
+      <ul id="quotes" class="quotes" aria-label="最新指數與收盤價（點選開啟來源網站）"></ul>
     </section>
 
     <section class="panel" aria-labelledby="summary-title">
@@ -54,7 +54,7 @@
         <li>台股預設整股（零股）買進，未用完的金額不扣款；手續費＝成交金額 × 費率，不足最低手續費以最低計。</li>
         <li>VOO 以投入當日美元匯率換算新台幣，預設可買碎股、股息預扣 30% 稅；市值以最新匯率換算。</li>
         <li>配息依除息日持股計算；勾選「股息再投入」會於除息日買進，否則列為已領現金，並計入總報酬。</li>
-        <li>股價與配息來自 Yahoo Finance，每個交易日由 GitHub Actions 自動更新。試算結果僅供參考，不構成投資建議，實際成交以券商對帳單為準。</li>
+        <li>股價、配息與加權指數來自 Yahoo Finance，台指期夜盤（近月、盤後交易時段）來自臺灣期貨交易所；每個交易日由 GitHub Actions 自動更新兩次（台灣時間 07:17 與 14:17），點選行情卡片可開啟來源網站看即時報價。試算結果僅供參考，不構成投資建議，實際成交以券商對帳單為準。</li>
       </ul>
     </section>
     <footer>設定與投入紀錄只儲存在這台裝置的瀏覽器中；換手機或清除瀏覽資料會遺失。</footer>

@@ -2,7 +2,7 @@
 
 ## 專案結構
 
-純前端靜態網站（GitHub Pages），不需建置。頁面為 `index.html`、`style.css`；邏輯放在 `src/`（`dca.js` 為試算核心純函式，`yahoo.js` 解析股價 API，`chart.js` 繪圖，`app.js` 處理畫面）；資料下載腳本放在 `scripts/`，產生的股價資料為 `data/prices.json`（由 GitHub Actions 更新，請勿手動編輯）；測試放在 `tests/`，檔名為 `*.test.js`。
+純前端靜態網站（GitHub Pages），不需建置。頁面為 `index.html`、`style.css`；邏輯放在 `src/`（`dca.js` 為試算核心純函式，`yahoo.js` 解析股價 API，`taifex.js` 解析期交所夜盤資料，`chart.js` 繪圖，`app.js` 處理畫面）；資料下載腳本放在 `scripts/`，產生的股價資料為 `data/prices.json`（由 GitHub Actions 更新，請勿手動編輯）；測試放在 `tests/`，檔名為 `*.test.js`。
 
 ## 建置、測試與開發指令
 

@@ -1,4 +1,4 @@
-name: probe data sources
+name: probe fetch script
 on:
   push:
     branches: ['claude/**']
@@ -7,18 +7,10 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: probe
-        run: |
-          UA='Mozilla/5.0'
-          for s in '%5ETWII' 'WTX%26' 'TXF%3DF' '%5ETWOII'; do
-            echo "== yahoo $s"; curl -sS -m 20 -A "$UA" "https://query1.finance.yahoo.com/v8/finance/chart/$s?range=5d&interval=1d" | head -c 700; echo
-          done
-          echo "== taifex openapi list"; curl -sS -m 30 -A "$UA" "https://openapi.taifex.com.tw/v1/DailyMarketReportFut" -o fut.json; ls -la fut.json; head -c 600 fut.json; echo
-          python3 - <<'PY'
-          import json
-          d=json.load(open('fut.json'))
-          print(len(d)); print(d[0].keys())
-          tx=[r for r in d if r.get('Contract')=='TX']
-          for r in tx[:12]: print(r)
-          PY
-          echo "== taifex csv"; curl -sS -m 30 -A "$UA" -X POST "https://www.taifex.com.tw/cht/3/futDataDown" -d "down_type=1&commodity_id=TX&queryStartDate=$(date -d '-3 day' +%Y/%m/%d)&queryEndDate=$(date +%Y/%m/%d)" | iconv -f big5 -t utf-8 2>/dev/null | head -20
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test
+      - run: node scripts/fetch-prices.mjs
+      - run: node -e "const d=require('./data/prices.json');console.log(JSON.stringify(d.indices.TWII?.dates?.slice(-3)), JSON.stringify(d.indices.TWII?.close?.slice(-3)));console.log(JSON.stringify(d.indices.TX_NIGHT?.series?.slice(-3)))"
