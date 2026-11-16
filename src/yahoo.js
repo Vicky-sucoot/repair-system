@@ -38,7 +38,9 @@ export function parseYahooChart(json) {
   };
 }
 
-export function chartUrl(symbol, host = 'query1.finance.yahoo.com') {
+/** days：只下載最近幾天（指數只需近期行情）；省略則下載全部歷史。 */
+export function chartUrl(symbol, host = 'query1.finance.yahoo.com', days = null) {
   const now = Math.floor(Date.now() / 1000);
-  return `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?period1=0&period2=${now}&interval=1d&events=div&includeAdjustedClose=false`;
+  const start = days ? now - days * 86400 : 0;
+  return `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?period1=${start}&period2=${now}&interval=1d&events=div&includeAdjustedClose=false`;
 }

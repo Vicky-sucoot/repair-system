@@ -20,10 +20,12 @@
 
 ## 股價資料
 
-瀏覽器無法直接跨網域讀取 Yahoo Finance，因此由 GitHub Actions 工作流程 [`update-prices.yml`](.github/workflows/update-prices.yml) 執行 `scripts/fetch-prices.mjs`：
+「最新行情」顯示**加權指數**、**台指期夜盤**（近月、盤後交易時段）、0050、VOO 與美元匯率，點選卡片會在新視窗開啟來源網站（Yahoo 股市、期交所）查看即時報價。
 
-- 下載 0050.TW、VOO 的日收盤價與配息，以及美元兌新台幣匯率（`TWD=X`），寫入 `data/prices.json` 並提交回 `main`。
-- 觸發時機：週一至週五 UTC 23:17（台灣時間週二至週六 07:17）、修改 `src/`／抓取腳本並推送到 `main` 時，或在 Actions 頁面手動執行「更新股價資料」。
+瀏覽器無法直接跨網域讀取 Yahoo Finance 與期交所，因此由 GitHub Actions 工作流程 [`update-prices.yml`](.github/workflows/update-prices.yml) 執行 `scripts/fetch-prices.mjs`：
+
+- 下載 0050.TW、VOO 的日收盤價與配息、美元兌新台幣匯率（`TWD=X`）、加權指數（`^TWII`），以及期交所台指期（TX）夜盤行情，寫入 `data/prices.json` 並提交回 `main`。
+- 觸發時機：台灣時間週二至週六 07:17（美股收盤、夜盤 05:00 收盤後）與週一至週五 14:17（台股收盤後）、修改 `src/`／抓取腳本並推送到 `main` 時，或在 Actions 頁面手動執行「更新股價資料」。
 - 單一標的下載失敗時沿用上一版資料；全部失敗則不更新。
 - 網站顯示資料更新時間，超過 4 天未更新會提示資料可能已過期。
 
@@ -32,6 +34,7 @@
 - `index.html`、`style.css`：頁面與樣式
 - `src/dca.js`：定期不定額試算核心（純函式，瀏覽器與測試共用）
 - `src/yahoo.js`：解析 Yahoo Finance chart API
+- `src/taifex.js`：解析期交所期貨每日行情 CSV（台指期夜盤）
 - `src/chart.js`：SVG 走勢圖
 - `src/app.js`：表單、讀取資料與畫面更新
 - `scripts/fetch-prices.mjs`：下載股價並產生 `data/prices.json`

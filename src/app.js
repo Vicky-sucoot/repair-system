@@ -360,21 +360,56 @@ function render() {
   renderSummary();
 }
 
+// 最新行情卡片：每張可點開來源網站查看最新報價。
+const QUOTE_LINKS = {
+  '0050.TW': 'https://tw.stock.yahoo.com/quote/0050.TW',
+  'VOO': 'https://finance.yahoo.com/quote/VOO/',
+  [FX_SYMBOL]: 'https://finance.yahoo.com/quote/TWD%3DX/',
+  TWII: 'https://tw.stock.yahoo.com/quote/%5ETWII',
+  TX_NIGHT: 'https://www.taifex.com.tw/cht/3/futDailyMarketReport'
+};
+const indexNumber = n => n.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function quoteCard({ key, short, name, value, change, detail, date }) {
+  const li = text('li', '', 'quote');
+  const link = text('a', '', 'quote-link');
+  link.href = QUOTE_LINKS[key];
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.title = `開啟 ${short} 最新行情（新視窗）`;
+  link.append(text('span', short, 'quote-symbol'), text('span', name, 'quote-name'),
+    text('strong', value, 'quote-price'), text('span', detail, `quote-change ${tone(change)}`), text('span', date, 'quote-date'));
+  li.append(link);
+  return li;
+}
 function renderQuotes() {
   const list = $('#quotes');
-  list.replaceChildren();
+  const cards = [];
+  // 指數放最前面。
+  const twii = prices.indices?.TWII;
+  if (twii?.close?.length) {
+    const n = twii.close.length;
+    const change = n > 1 ? twii.close[n - 1] / twii.close[n - 2] - 1 : 0;
+    const diff = n > 1 ? twii.close[n - 1] - twii.close[n - 2] : 0;
+    cards.push(quoteCard({ key: 'TWII', short: '加權指數', name: '台灣證券交易所', value: indexNumber(twii.close[n - 1]), change,
+      detail: `${diff >= 0 ? '+' : ''}${indexNumber(diff)}（${format.percent(change)}）`, date: twii.dates[n - 1] }));
+  }
+  const night = prices.indices?.TX_NIGHT?.series?.at(-1);
+  if (night) {
+    const pct = night.changePct == null ? null : night.changePct / 100;
+    cards.push(quoteCard({ key: 'TX_NIGHT', short: '台指期夜盤', name: `近月 ${night.month.slice(0, 4)}/${night.month.slice(4)}`, value: twd.format(night.close), change: night.change ?? 0,
+      detail: `${night.change > 0 ? '+' : ''}${night.change ?? '—'}（${format.percent(pct)}）`, date: `${night.date} 夜盤收盤` }));
+  }
   const entries = [...Object.entries(ASSETS).map(([s, a]) => [s, a.short, a.name, a.currency]), [FX_SYMBOL, 'USD/TWD', '美元兌新台幣', 'FX']];
   for (const [symbol, short, name, currency] of entries) {
     const s = prices.symbols[symbol];
     if (!s) continue;
     const n = s.close.length;
     const change = n > 1 ? s.close[n - 1] / s.close[n - 2] - 1 : 0;
-    const li = text('li', '', 'quote');
-    li.append(text('span', short, 'quote-symbol'), text('span', name, 'quote-name'),
-      text('strong', currency === 'FX' ? s.close[n - 1].toFixed(3) : format.price(s.close[n - 1], currency), 'quote-price'),
-      text('span', `${format.percent(change)}・${s.dates[n - 1]}`, `quote-change ${tone(change)}`));
-    list.append(li);
+    cards.push(quoteCard({ key: symbol, short, name, change,
+      value: currency === 'FX' ? s.close[n - 1].toFixed(3) : format.price(s.close[n - 1], currency),
+      detail: format.percent(change), date: s.dates[n - 1] }));
   }
+  list.replaceChildren(...cards);
 }
 
 async function loadPrices() {
@@ -391,7 +426,7 @@ async function loadPrices() {
     prices = data;
     const updated = new Date(data.updatedAt);
     const ageDays = (Date.now() - updated.getTime()) / 86400000;
-    status.textContent = `資料來源：${data.source || 'Yahoo Finance'}・更新於 ${updated.toLocaleString('zh-TW', { hour12: false })}${ageDays > 4 ? '（資料可能已過期）' : ''}`;
+    status.textContent = `資料來源：Yahoo Finance、臺灣期貨交易所・每個交易日自動更新・更新於 ${updated.toLocaleString('zh-TW', { hour12: false })}${ageDays > 4 ? '（資料可能已過期）' : ''}`;
     if (ageDays > 4) status.className = 'error';
     renderQuotes();
   } catch (error) {
