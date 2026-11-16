@@ -75,7 +75,7 @@ button:disabled { cursor: not-allowed; }
 /* 每月投入 */
 .plan h3 { margin: 24px 0 4px; font-size: 1.05rem; padding-top: 16px; border-top: 1px solid var(--border); }
 .plan .section-heading + h3 { border-top: 0; padding-top: 0; margin-top: 8px; }
-.entry-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 14px; align-items: end; margin-top: 8px; }
+.entry-grid { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 14px; align-items: end; margin-top: 8px; }
 .entry-buttons { display: flex; gap: 8px; }
 .entry-buttons button { min-width: 96px; }
 .entry-status { min-height: 1.6em; }
@@ -125,7 +125,7 @@ th { position: sticky; top: 0; background: var(--surface); color: var(--ink-2); 
 .notes { padding-left: 1.2em; color: var(--ink-2); font-size: .9rem; }
 footer { text-align: center; margin-top: 28px; color: var(--ink); }
 
-@media (max-width: 760px) { .grid { grid-template-columns: 1fr 1fr; } .entry-grid { grid-template-columns: 1fr 1fr; } .entry-buttons { grid-column: 1 / -1; } .entry-buttons button { flex: 1; } }
+@media (max-width: 760px) { .grid { grid-template-columns: 1fr 1fr; } .entry-grid { grid-template-columns: 1fr 1fr; } .entry-grid label:nth-child(3) { grid-column: 1 / -1; } .entry-buttons { grid-column: 1 / -1; } .entry-buttons button { flex: 1; } }
 @media (max-width: 580px) {
   main { padding: 24px 16px; }
   .panel { padding: 18px; border-radius: 14px; }

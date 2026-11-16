@@ -36,7 +36,7 @@ function loadPlans() {
       for (const key of SETTING_FIELDS) if (p?.[key] !== undefined) plan[key] = p[key];
       if (!ASSETS[plan.symbol]) plan.symbol = DEFAULT_PLANS[i].symbol;
       plan.entries = Array.isArray(p?.entries)
-        ? p.entries.filter(e => e && typeof e.date === 'string' && Number(e.amount) > 0).map(e => ({ id: String(e.id), date: e.date, amount: Number(e.amount) }))
+        ? p.entries.filter(e => e && typeof e.date === 'string' && Number(e.amount) > 0).map(e => ({ id: String(e.id), date: e.date, amount: Number(e.amount), price: Number(e.price) > 0 ? Number(e.price) : null }))
         : [];
       return plan;
     });
@@ -136,12 +136,20 @@ function setEditing(card, editing) {
 function submitPlan(index, card) {
   const form = card.querySelector('.plan-form');
   if (!form.reportValidity()) return;
-  plans[index] = { ...readForm(form), entries: plans[index].entries };
+  const values = readForm(form);
+  const previous = plans[index];
+  let note = '';
+  // 換標的後，舊紀錄的手動成交價屬於原標的，清除後改用收盤價。
+  if (values.symbol !== previous.symbol && previous.entries.some(e => e.price > 0)) {
+    previous.entries.forEach(e => { e.price = null; });
+    note = '已更換標的，每月投入的手動成交價已清除，改用收盤價計算。';
+  }
+  plans[index] = { ...values, entries: previous.entries };
   fillForm(form, plans[index]);
   savePlans();
   setEditing(card, false);
   render();
-  card.querySelector('.edit-status').textContent = '已送出並重新計算。';
+  card.querySelector('.edit-status').textContent = `已送出並重新計算。${note}`;
 }
 
 // ---------- 每月投入（定期不定額） ----------
@@ -162,21 +170,23 @@ function setupEntryForm(index, card) {
     const date = form.elements.date.value;
     const amount = Math.round(Number(form.elements.amount.value));
     if (!(amount > 0)) return;
+    const priceValue = Number(form.elements.price.value);
+    const price = form.elements.price.value !== '' && priceValue > 0 ? priceValue : null;
     const plan = plans[index];
     const editingId = editingEntry[index];
     const sameMonth = plan.entries.filter(e => e.id !== editingId && e.date.slice(0, 7) === date.slice(0, 7)).length;
     if (editingId) {
       const entry = plan.entries.find(e => e.id === editingId);
-      if (entry) Object.assign(entry, { date, amount });
+      if (entry) Object.assign(entry, { date, amount, price });
     } else {
-      plan.entries.push({ id: newId(), date, amount });
+      plan.entries.push({ id: newId(), date, amount, price });
     }
     plan.entries.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     savePlans();
     resetEntryForm(index, card);
     render();
     card.querySelector('.entry-status').textContent =
-      `${editingId ? '已修改' : '已送出'}：${date} 投入 ${format.money(amount)}。${sameMonth ? `（${date.slice(0, 7)} 共有 ${sameMonth + 1} 筆投入）` : ''}`;
+      `${editingId ? '已修改' : '已送出'}：${date} 投入 ${format.money(amount)}${price ? `，成交價 ${format.price(price, ASSETS[plan.symbol].currency)}` : ''}。${sameMonth ? `（${date.slice(0, 7)} 共有 ${sameMonth + 1} 筆投入）` : ''}`;
   });
   card.querySelector('.entry-cancel').addEventListener('click', () => {
     resetEntryForm(index, card);
@@ -188,6 +198,7 @@ function resetEntryForm(index, card) {
   editingEntry[index] = null;
   form.elements.date.value = todayString();
   form.elements.amount.value = '';
+  form.elements.price.value = '';
   form.querySelector('.entry-submit').textContent = '送出';
   form.querySelector('.entry-cancel').hidden = true;
   card.classList.remove('editing-entry');
@@ -200,6 +211,7 @@ function editEntry(index, id) {
   editingEntry[index] = id;
   form.elements.date.value = entry.date;
   form.elements.amount.value = entry.amount;
+  form.elements.price.value = entry.price > 0 ? entry.price : '';
   form.querySelector('.entry-submit').textContent = '儲存修改';
   form.querySelector('.entry-cancel').hidden = false;
   card.classList.add('editing-entry');
@@ -276,6 +288,7 @@ function renderPlan(index) {
   const card = document.querySelector(`.plan[data-index="${index}"]`);
   card.querySelector('.plan-title').textContent = `${asset.short} ${asset.name}`;
   card.querySelector('.plan-currency').textContent = asset.currency === 'USD' ? '美元計價・換算新台幣' : '新台幣計價';
+  card.querySelector('.entry-price-unit').textContent = asset.currency === 'USD' ? 'US$' : 'NT$';
   const message = card.querySelector('.plan-message');
   const tiles = card.querySelector('.plan-tiles');
   const txTable = card.querySelector('.tx-table');
