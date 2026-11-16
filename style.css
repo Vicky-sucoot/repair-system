@@ -1,9 +1,9 @@
 :root {
   color-scheme: light;
-  --bg: #fdeef3; --surface: #ffffff; --surface-2: #edf5f1; --border: #d9e5df; --field: #9eb5ab;
+  --bg: #f6bfd0; --surface: #fff1f5; --surface-2: #fde2eb; --border: #f2c4d3; --field: #b98a9a;
   --ink: #193430; --ink-2: #526b63; --accent: #155e59; --accent-hover: #104b47;
   --up: #b42318; --down: #137333; /* 台灣慣例：漲紅跌綠 */
-  --series-total: #2a78d6; --series-invested: #eb6834; --grid: #e3ebe7;
+  --series-total: #2a78d6; --series-invested: #eb6834; --grid: #f6d9e3;
   font-family: system-ui, -apple-system, "Noto Sans TC", sans-serif; color: var(--ink); background: var(--bg); line-height: 1.6;
 }
 @media (prefers-color-scheme: dark) {
@@ -107,7 +107,7 @@ th, td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: 
 th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
 th { position: sticky; top: 0; background: var(--surface); color: var(--ink-2); font-weight: 600; }
 .notes { padding-left: 1.2em; color: var(--ink-2); font-size: .9rem; }
-footer { text-align: center; margin-top: 28px; }
+footer { text-align: center; margin-top: 28px; color: var(--ink); } /* 直接位於粉紅底上，用主文字色維持對比 */
 
 @media (max-width: 760px) { .grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 580px) {
