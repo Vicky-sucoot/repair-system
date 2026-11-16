@@ -9,7 +9,7 @@ const DEFAULT_PLANS = [
   { symbol: 'VOO', startDate: '2020-01-02', initial: 100000, ...MARKET_DEFAULTS.US, reinvest: true, entries: [] }
 ];
 const NUMBER_FIELDS = ['initial', 'feeRate', 'minFee', 'dividendTax'];
-const SETTING_FIELDS = ['symbol', 'startDate', ...NUMBER_FIELDS, 'wholeShares', 'reinvest'];
+const SETTING_FIELDS = ['symbol', 'startDate', ...NUMBER_FIELDS, 'initialPrice', 'wholeShares', 'reinvest'];
 
 const twd = new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 0 });
 const format = {
@@ -95,7 +95,8 @@ function buildPlans() {
     // 切換標的時先帶入該市場的預設手續費與稅率，按送出才生效。
     select.addEventListener('change', () => {
       const defaults = MARKET_DEFAULTS[ASSETS[select.value].market];
-      fillForm(form, { ...readForm(form), ...defaults, symbol: select.value });
+      // 不同標的價格不同，清除原本輸入的成交價。
+      fillForm(form, { ...readForm(form), ...defaults, symbol: select.value, initialPrice: null });
     });
     form.addEventListener('submit', event => { event.preventDefault(); submitPlan(index, card); });
     card.querySelector('.edit-button').addEventListener('click', () => {
@@ -111,12 +112,16 @@ function fillForm(form, plan) {
   form.elements.symbol.value = plan.symbol;
   form.elements.startDate.value = plan.startDate;
   NUMBER_FIELDS.forEach(name => { form.elements[name].value = plan[name]; });
+  form.elements.initialPrice.value = plan.initialPrice > 0 ? plan.initialPrice : '';
+  form.querySelector('.price-unit').textContent = ASSETS[plan.symbol].currency === 'USD' ? 'US$' : 'NT$';
   form.elements.wholeShares.checked = plan.wholeShares;
   form.elements.reinvest.checked = plan.reinvest;
 }
 function readForm(form) {
   const values = { symbol: form.elements.symbol.value, startDate: form.elements.startDate.value };
   NUMBER_FIELDS.forEach(name => { values[name] = Number(form.elements[name].value); });
+  const price = Number(form.elements.initialPrice.value);
+  values.initialPrice = form.elements.initialPrice.value !== '' && price > 0 ? price : null;
   values.wholeShares = form.elements.wholeShares.checked;
   values.reinvest = form.elements.reinvest.checked;
   return values;
@@ -256,7 +261,7 @@ function renderEntryTable(index, element, result) {
     }
     tr.append(actions);
     const cells = t
-      ? [format.price(t.price, result.currency), format.shares(t.shares, whole), t.feeTWD ? format.money(t.feeTWD) : '—', format.money(t.investedAfter), format.shares(t.sharesAfter, whole)]
+      ? [`${format.price(t.price, result.currency)}${t.manualPrice ? '（手動）' : ''}`, format.shares(t.shares, whole), t.feeTWD ? format.money(t.feeTWD) : '—', format.money(t.investedAfter), format.shares(t.sharesAfter, whole)]
       : [result ? '待成交' : '—', '—', '—', '—', '—'];
     cells.forEach(c => tr.append(text('td', c)));
     tbody.append(tr);
