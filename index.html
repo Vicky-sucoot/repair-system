@@ -63,23 +63,30 @@
     <section class="panel plan">
       <div class="section-heading"><h2 class="plan-title"></h2><span class="badge plan-currency"></span></div>
       <form class="plan-form">
+        <fieldset class="plan-fields">
         <div class="grid">
           <label>投資標的<select name="symbol"></select></label>
           <label>開始日期<input name="startDate" type="date" required min="2003-07-01"></label>
-          <label>原始投入金額（新台幣）<input name="initial" type="number" inputmode="numeric" min="0" step="1000"></label>
-          <label>每月定期定額（新台幣）<input name="monthly" type="number" inputmode="numeric" min="0" step="1000"></label>
-          <label>每月扣款日<input name="day" type="number" inputmode="numeric" min="1" max="31" step="1"></label>
-          <label>手續費率（%）<input name="feeRate" type="number" inputmode="decimal" min="0" max="5" step="0.0001"></label>
-          <label>最低手續費（新台幣）<input name="minFee" type="number" inputmode="decimal" min="0" step="1"></label>
-          <label>股息預扣稅（%）<input name="dividendTax" type="number" inputmode="decimal" min="0" max="100" step="1"></label>
+          <label>原始投入金額（新台幣）<input name="initial" type="number" required inputmode="numeric" min="0" step="1000"></label>
+          <label>每月定期定額（新台幣）<input name="monthly" type="number" required inputmode="numeric" min="0" step="1000"></label>
+          <label>每月扣款日<input name="day" type="number" required inputmode="numeric" min="1" max="31" step="1"></label>
+          <label>手續費率（%）<input name="feeRate" type="number" required inputmode="decimal" min="0" max="5" step="0.0001"></label>
+          <label>最低手續費（新台幣）<input name="minFee" type="number" required inputmode="decimal" min="0" step="1"></label>
+          <label>股息預扣稅（%）<input name="dividendTax" type="number" required inputmode="decimal" min="0" max="100" step="1"></label>
         </div>
         <div class="checks">
           <label class="check"><input name="wholeShares" type="checkbox">整股買進（不買碎股）</label>
           <label class="check"><input name="reinvest" type="checkbox">股息再投入</label>
         </div>
+        </fieldset>
       </form>
       <p class="plan-message" role="status" aria-live="polite"></p>
       <div class="tiles plan-tiles"></div>
+      <div class="plan-actions">
+        <button type="button" class="edit-button secondary">修改</button>
+        <button type="submit" class="submit-button">送出</button>
+        <span class="edit-status hint" role="status" aria-live="polite"></span>
+      </div>
       <details><summary>交易紀錄</summary><div class="table-wrap"><table class="tx-table"></table></div></details>
     </section>
   </template>

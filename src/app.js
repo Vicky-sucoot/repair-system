@@ -65,6 +65,7 @@ function table(element, head, rows) {
 }
 
 // ---------- 方案表單 ----------
+// 表單預設鎖定；按「修改」解鎖編輯，按「送出」驗證、儲存並重新計算。
 function buildPlans() {
   const container = $('#plans');
   const template = $('#plan-template');
@@ -72,13 +73,25 @@ function buildPlans() {
     const card = template.content.firstElementChild.cloneNode(true);
     card.dataset.index = index;
     const form = card.querySelector('form');
+    // 送出鍵位於表單外（交易紀錄上方），以 form 屬性連結到表單。
+    form.id = `plan-form-${index}`;
+    card.querySelector('.submit-button').setAttribute('form', form.id);
     const select = form.elements.symbol;
     for (const [symbol, asset] of Object.entries(ASSETS)) {
       select.append(new Option(`${asset.short} ${asset.name}`, symbol));
     }
     fillForm(form, plan);
-    form.addEventListener('input', event => onPlanInput(index, form, event.target));
-    form.addEventListener('submit', event => event.preventDefault());
+    setEditing(card, false);
+    // 切換標的時先帶入該市場的預設手續費與稅率，按送出才生效。
+    select.addEventListener('change', () => {
+      const defaults = MARKET_DEFAULTS[ASSETS[select.value].market];
+      fillForm(form, { ...readForm(form), ...defaults, symbol: select.value });
+    });
+    form.addEventListener('submit', event => { event.preventDefault(); submitPlan(index, card); });
+    card.querySelector('.edit-button').addEventListener('click', () => {
+      setEditing(card, true);
+      form.elements.initial.focus();
+    });
     container.append(card);
   });
   const today = new Date().toISOString().slice(0, 10);
@@ -91,24 +104,30 @@ function fillForm(form, plan) {
   form.elements.wholeShares.checked = plan.wholeShares;
   form.elements.reinvest.checked = plan.reinvest;
 }
-function onPlanInput(index, form, target) {
-  const plan = plans[index];
-  if (target.name === 'symbol') {
-    plan.symbol = target.value;
-    Object.assign(plan, MARKET_DEFAULTS[ASSETS[plan.symbol].market]);
-    fillForm(form, plan);
-  } else if (target.type === 'checkbox') {
-    plan[target.name] = target.checked;
-  } else if (target.name === 'startDate') {
-    if (!target.value) return;
-    plan.startDate = target.value;
-  } else if (NUMBER_FIELDS.includes(target.name)) {
-    const value = Number(target.value);
-    if (target.value === '' || !Number.isFinite(value) || value < 0) return;
-    plan[target.name] = target.name === 'day' ? Math.min(31, Math.max(1, Math.round(value))) : value;
-  }
+function readForm(form) {
+  const values = { symbol: form.elements.symbol.value, startDate: form.elements.startDate.value };
+  NUMBER_FIELDS.forEach(name => { values[name] = Number(form.elements[name].value); });
+  values.day = Math.min(31, Math.max(1, Math.round(values.day)));
+  values.wholeShares = form.elements.wholeShares.checked;
+  values.reinvest = form.elements.reinvest.checked;
+  return values;
+}
+function setEditing(card, editing) {
+  card.querySelector('.plan-fields').disabled = !editing;
+  card.querySelector('.submit-button').disabled = !editing;
+  card.querySelector('.edit-button').disabled = editing;
+  card.classList.toggle('editing', editing);
+  card.querySelector('.edit-status').textContent = editing ? '修改中：調整後請按「送出」重新計算。' : '';
+}
+function submitPlan(index, card) {
+  const form = card.querySelector('form');
+  if (!form.reportValidity()) return;
+  plans[index] = readForm(form);
+  fillForm(form, plans[index]);
   savePlans();
+  setEditing(card, false);
   render();
+  card.querySelector('.edit-status').textContent = '已送出並重新計算。';
 }
 
 // ---------- 計算與顯示 ----------

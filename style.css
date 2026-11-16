@@ -1,6 +1,6 @@
 :root {
   color-scheme: light;
-  --bg: #f2f6f4; --surface: #ffffff; --surface-2: #edf5f1; --border: #d9e5df; --field: #9eb5ab;
+  --bg: #fdeef3; --surface: #ffffff; --surface-2: #edf5f1; --border: #d9e5df; --field: #9eb5ab;
   --ink: #193430; --ink-2: #526b63; --accent: #155e59; --accent-hover: #104b47;
   --up: #b42318; --down: #137333; /* 台灣慣例：漲紅跌綠 */
   --series-total: #2a78d6; --series-invested: #eb6834; --grid: #e3ebe7;
@@ -9,14 +9,14 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #111816; --surface: #1a2220; --surface-2: #22302c; --border: #2e3c38; --field: #4a5e57;
+    --bg: #241a1e; --surface: #1a2220; --surface-2: #22302c; --border: #2e3c38; --field: #4a5e57;
     --ink: #e6efec; --ink-2: #a9bbb5; --accent: #3aa597; --accent-hover: #4dbdae;
     --up: #f07a6e; --down: #5cc77f; --series-total: #3987e5; --series-invested: #d95926; --grid: #2a3633;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #111816; --surface: #1a2220; --surface-2: #22302c; --border: #2e3c38; --field: #4a5e57;
+  --bg: #241a1e; --surface: #1a2220; --surface-2: #22302c; --border: #2e3c38; --field: #4a5e57;
   --ink: #e6efec; --ink-2: #a9bbb5; --accent: #3aa597; --accent-hover: #4dbdae;
   --up: #f07a6e; --down: #5cc77f; --series-total: #3987e5; --series-invested: #d95926; --grid: #2a3633;
 }
@@ -62,6 +62,12 @@ button:disabled { opacity: .6; cursor: wait; }
 .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 12px; }
 label { display: block; font-weight: 600; font-size: .9rem; }
 input, select { display: block; width: 100%; font: inherit; font-weight: 400; color: inherit; background: var(--surface); border: 1px solid var(--field); border-radius: 9px; padding: 10px; margin-top: 6px; min-height: 44px; }
+.plan-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
+.plan-fields:disabled input, .plan-fields:disabled select { background: var(--surface-2); color: var(--ink-2); border-color: var(--border); cursor: not-allowed; opacity: 1; }
+.plan.editing { border-color: var(--accent); }
+.plan-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
+.plan-actions button { min-width: 96px; }
+button:disabled { cursor: not-allowed; }
 .checks { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 12px; }
 .check { display: flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 500; }
 .check input { width: 20px; height: 20px; min-height: 0; margin: 0; accent-color: var(--accent); }
