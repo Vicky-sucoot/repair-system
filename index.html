@@ -49,7 +49,7 @@
     <section class="panel">
       <h2>計算方式</h2>
       <ul class="notes">
-        <li>原始投入於原始投入日期一次買進；每月投入依輸入的日期買進，遇假日順延至下一個交易日，皆以當日收盤價成交。每筆投入會累積到庫存中。</li>
+        <li>原始投入於原始投入日期一次買進；有輸入「原始投入成交價」時以該價格換算股數（VOO 以美元計），空白則用當日收盤價；每月投入依輸入的日期買進，遇假日順延至下一個交易日，皆以當日收盤價成交。每筆投入會累積到庫存中。</li>
         <li>投入日期晚於最新股價日期（例如今天尚未收盤）時列為「待成交」，等股價更新後自動計入。</li>
         <li>台股預設整股（零股）買進，未用完的金額不扣款；手續費＝成交金額 × 費率，不足最低手續費以最低計。</li>
         <li>VOO 以投入當日美元匯率換算新台幣，預設可買碎股、股息預扣 30% 稅；市值以最新匯率換算。</li>
@@ -71,6 +71,7 @@
           <label>投資標的<select name="symbol"></select></label>
           <label>原始投入日期<input name="startDate" type="date" required min="2009-01-01"></label>
           <label>原始投入金額（新台幣）<input name="initial" type="number" required inputmode="numeric" min="0" step="1"></label>
+          <label>原始投入成交價（<span class="price-unit">NT$</span>）<input name="initialPrice" type="number" inputmode="decimal" min="0.0001" step="any" placeholder="空白＝當日收盤價"></label>
           <label>手續費率（%）<input name="feeRate" type="number" required inputmode="decimal" min="0" max="5" step="0.0001"></label>
           <label>最低手續費（新台幣）<input name="minFee" type="number" required inputmode="decimal" min="0" step="1"></label>
           <label>股息預扣稅（%）<input name="dividendTax" type="number" required inputmode="decimal" min="0" max="100" step="1"></label>

@@ -72,7 +72,7 @@ export function xirr(flows) {
 
 /**
  * 模擬一個定期不定額方案：原始投入一次買進，之後每筆手動輸入的金額各自買進（累積）。
- * @param plan { symbol, startDate, initial, entries: [{ id, date, amount }], feeRate(%), minFee(TWD), wholeShares, reinvest, dividendTax(%) }
+ * @param plan { symbol, startDate, initial, initialPrice（選填，原始投入的實際成交價，標的幣別）, entries: [{ id, date, amount }], feeRate(%), minFee(TWD), wholeShares, reinvest, dividendTax(%) }
  * @param series { dates, close, dividends: [[date, perShare]] } 標的的日收盤價
  * @param fx 美元兌新台幣日資料，台股可省略
  * 每筆投入以當日（遇假日順延至下一個交易日）收盤價成交；日期晚於最新股價者列為待成交。
@@ -90,7 +90,7 @@ export function simulate(plan, series, fx = null) {
 
   // 建立依日期排序的事件；同一天先除息（當天買進不參與配息），再買進，最後記錄走勢。
   const contributions = [];
-  if (plan.initial > 0 && plan.startDate) contributions.push({ id: 'initial', date: plan.startDate, amount: plan.initial, type: '原始投入' });
+  if (plan.initial > 0 && plan.startDate) contributions.push({ id: 'initial', date: plan.startDate, amount: plan.initial, type: '原始投入', price: plan.initialPrice > 0 ? Number(plan.initialPrice) : null });
   for (const entry of plan.entries || []) {
     if (entry.amount > 0 && entry.date) contributions.push({ ...entry, type: '每月投入' });
   }
@@ -123,15 +123,16 @@ export function simulate(plan, series, fx = null) {
   let cashTWD = 0;
   let dividendsTWD = 0;
 
-  const execute = (date, budgetTWD, type, id = null) => {
+  // manualPrice：使用者輸入的實際成交價；未輸入時以當日收盤價換算股數。
+  const execute = (date, budgetTWD, type, id = null, manualPrice = null) => {
     const index = indexOnOrAfter(dates, date);
-    const price = close[index];
+    const price = manualPrice > 0 ? manualPrice : close[index];
     const rate = rateAt(date);
     const result = buyShares(budgetTWD / rate, price, { ...fee, minFee: plan.minFee / rate });
     const costTWD = (result.gross + result.fee) * rate;
     shares += result.shares;
     feesTWD += result.fee * rate;
-    const tx = { id, date, type, amountTWD: budgetTWD, price, rate, shares: result.shares, feeTWD: result.fee * rate, costTWD, sharesAfter: shares };
+    const tx = { id, date, type, amountTWD: budgetTWD, price, manualPrice: manualPrice > 0, rate, shares: result.shares, feeTWD: result.fee * rate, costTWD, sharesAfter: shares };
     transactions.push(tx);
     return tx;
   };
@@ -139,7 +140,7 @@ export function simulate(plan, series, fx = null) {
   for (const event of events) {
     if (event.kind === 'buy') {
       const c = event.contribution;
-      const tx = execute(event.date, c.amount, c.type, c.id);
+      const tx = execute(event.date, c.amount, c.type, c.id, c.price);
       investedTWD += tx.costTWD;
       tx.investedAfter = investedTWD;
       tx.requestedDate = c.date;

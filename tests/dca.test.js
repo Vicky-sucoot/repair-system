@@ -48,6 +48,25 @@ test('原始投入加每月不同金額：累積庫存、投入與損益', () =>
   assert.ok(r.annualized > 0);
 });
 
+test('原始投入可手動輸入成交價，依該價格換算股數', () => {
+  const r = simulate({ ...twPlan, initialPrice: 80 }, series);
+  const initial = r.transactions.find(t => t.id === 'initial');
+  assert.equal(initial.price, 80);
+  assert.equal(initial.manualPrice, true);
+  assert.equal(initial.shares, 125); // 10000/80
+  assert.equal(r.shares, 125 + 45);
+  assert.equal(r.investedTWD, 15500);
+  // 未輸入或 0 時改用收盤價
+  assert.equal(simulate({ ...twPlan, initialPrice: null }, series).transactions.find(t => t.id === 'initial').price, 100);
+  assert.equal(simulate({ ...twPlan, initialPrice: 0 }, series).transactions.find(t => t.id === 'initial').manualPrice, false);
+});
+
+test('美元標的的手動成交價以美元計，依當日匯率換算', () => {
+  const fx = { dates: ['2024-01-01'], close: [30] };
+  const r = simulate({ ...twPlan, symbol: 'VOO', initial: 30000, initialPrice: 50, entries: [], wholeShares: false }, series, fx);
+  assert.equal(r.shares, 20); // 30000/30=1000 美元 / 50
+});
+
 test('紀錄可不依日期順序輸入，計算時依日期排序', () => {
   const shuffled = { ...twPlan, entries: [...twPlan.entries].reverse() };
   assert.equal(simulate(shuffled, series).shares, 145);
