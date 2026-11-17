@@ -113,8 +113,9 @@ def stock_table(rows: list[dict]) -> pd.DataFrame:
         return df
     df["net_value_e"] = (df["net_value"].astype(float) / 1e8).round(2)
     return df.rename(columns={"code": "代號", "name": "名稱", "market": "市場", "net_lots": "買賣超(張)",
-                              "net_value_e": "金額(億)", "streak_days": "連買天數", "price": "收盤價"})[
-        ["代號", "名稱", "市場", "買賣超(張)", "金額(億)", "連買天數", "收盤價"]]
+                              "net_value_e": "金額(億)", "streak_days": "連買天數", "sell_streak_days": "連賣天數",
+                              "price": "收盤價"})[
+        ["代號", "名稱", "市場", "買賣超(張)", "金額(億)", "連買天數", "連賣天數", "收盤價"]]
 
 
 with foreign_tab:
@@ -127,7 +128,7 @@ with foreign_tab:
         cols = st.columns(4)
         cols[0].metric("買超家數", c.get("buy", 0))
         cols[1].metric("賣超家數", c.get("sell", 0))
-        cols[2].metric(f"連續買超 ≥{data.get('streak_min_days', min_days)} 天", c.get("streaks", 0))
+        cols[2].metric(f"連買／連賣 ≥{data.get('streak_min_days', min_days)} 天", f"{c.get('streaks', 0)} / {c.get('sell_streaks', 0)}")
         cols[3].metric("單日大買／大賣", f"{c.get('big_buy', 0)} / {c.get('big_sell', 0)}")
         insight = data.get("insight")
         if not insight:  # SQLite 沒有存解讀，改讀每日流程匯出的 JSON（同一天才採用）
@@ -148,6 +149,8 @@ with foreign_tab:
             st.caption("設定 ANTHROPIC_API_KEY 後，每日流程會產生 Claude 解讀。")
         st.markdown("#### 連續買超")
         st.dataframe(stock_table(data["streaks"]), hide_index=True, width="stretch")
+        st.markdown("#### 連續賣超")
+        st.dataframe(stock_table(data.get("sell_streaks") or []), hide_index=True, width="stretch")
         left, right = st.columns(2)
         left.markdown("#### 單日大買（依金額）")
         left.dataframe(stock_table(data["big_buys"]), hide_index=True, width="stretch")

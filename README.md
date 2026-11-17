@@ -57,8 +57,9 @@
 
 1. **數據收集（外資動向）**：抓取證交所 `TWT38U` 與櫃買中心「外資及陸資買賣超彙總表」，存入 SQLite，回補最近 10 個交易日，篩選出：
    - **連續買超**：至今連續 3 天以上買超（`STREAK_MIN_DAYS`）。
+   - **連續賣超**：至今連續 3 天以上賣超，天數多的在前。
    - **單日大買／大賣**：依「買賣超股數 × 最新收盤價」排序，金額 ≥ 5 億元（`BIG_TRADE_VALUE`）標示為大買／大賣。
-   - **投信動向**：同樣方式抓取證交所 `TWT44U` 與櫃買中心「投信買賣超彙總表」，產生投信的連續買超、單日大買／大賣（門檻 1 億元，`TRUST_BIG_TRADE_VALUE`），顯示在網站「外資動向」頁的外資表格下方，並寫入 `data/trust.json`。
+   - **投信動向**：同樣方式抓取證交所 `TWT44U` 與櫃買中心「投信買賣超彙總表」，產生投信的連續買超、連續賣超、單日大買／大賣（門檻 1 億元，`TRUST_BIG_TRADE_VALUE`），顯示在網站「外資動向」頁的外資表格下方，並寫入 `data/trust.json`。
 2. **消息面分析（財經新聞）**：抓取鉅亨網（API）、經濟日報與工商時報（RSS）的當日新聞，只保存標題、連結與 200 字摘要（不轉存全文），抓取前會先檢查 robots.txt。判斷每則新聞是「利多」「利空」或「中性」，並擷取利多／利空關鍵字和相關個股：
    - **Claude（主要分析方式）**：以 `claude-opus-5-5`（可用 `ANTHROPIC_MODEL` 更換）的結構化輸出取得情緒、分數、關鍵字、相關個股與理由，不存在的股票代號會被剔除。啟用後，先前以關鍵字分析的新聞也會重新分析。
    - **關鍵字詞典（備援）**：沒有金鑰、呼叫失敗或被拒答時自動使用，會處理「不看好」之類的否定詞，以及「世界」這類和常用詞同名的股票。
@@ -87,7 +88,7 @@ streamlit run dashboard/app.py         # Streamlit 儀表板
 python -m pytest analysis/tests        # Python 測試
 ```
 
-API：`GET /api/recommendations`（今日觀察名單，可帶 `top_n`、`big_value`）、`GET /api/foreign`（連續買超、大買、大賣，可帶 `min_days`、`big_value`、`top_n`）、`GET /api/foreign/{代號}`、`GET /api/news?sentiment=利多&stock=2330`、`GET /api/news/stocks`、`POST /api/refresh`（背景重新抓取，僅供本機，未加驗證）。
+API：`GET /api/recommendations`（今日觀察名單，可帶 `top_n`、`big_value`）、`GET /api/foreign`、`GET /api/trust`（連續買超、連續賣超、大買、大賣，可帶 `min_days`、`big_value`、`top_n`）、`GET /api/foreign/{代號}`、`GET /api/news?sentiment=利多&stock=2330`、`GET /api/news/stocks`、`POST /api/refresh`（背景重新抓取，僅供本機，未加驗證）。
 
 > 外資資料與新聞版權屬各來源網站；情緒為程式自動判斷，可能誤判，僅供參考，不構成投資建議。
 
