@@ -98,3 +98,15 @@ def test_dedupe_ticks_keeps_latest_index_flash():
     kept = news.dedupe_ticks(items)
     assert len(kept) == 3
     assert any("306.17" in i["title"] for i in kept) and not any("310.23" in i["title"] for i in kept)
+
+
+def test_export_quotes_keeps_market_dates(tmp_path):
+    import json
+    from analysis import pipeline
+    pipeline.export_quotes(tmp_path / "q.json", [
+        {"code": "2330", "name": "台積電", "market": "TWSE", "close": 2215.0, "change": -135.0, "date": "2026-11-16"},
+        {"code": "1815", "name": "富喬", "market": "TPEx", "close": 118.0, "change": -13.0, "date": "2026-11-17"},
+        {"code": "9999", "name": "無成交", "market": "TPEx", "close": None, "change": None, "date": "2026-11-17"}])
+    q = json.loads((tmp_path / "q.json").read_text(encoding="utf-8"))
+    assert q["dates"] == {"TWSE": "2026-11-16", "TPEx": "2026-11-17"}
+    assert q["quotes"] == {"2330": ["台積電", "TWSE", 2215.0, -135.0], "1815": ["富喬", "TPEx", 118.0, -13.0]}

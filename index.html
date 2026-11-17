@@ -16,6 +16,7 @@
   <script type="module" src="./src/intel.js"></script>
   <script defer src="./pwa.js"></script>
   <script defer src="./src/tabs.js"></script>
+  <script defer src="./src/mylist.js"></script>
 </head>
 <body>
   <main>
@@ -68,6 +69,20 @@
           <button id="reload-button" class="secondary" type="button">重新讀取</button>
         </div>
         <ul id="quotes" class="quotes" aria-label="最新指數與收盤價（點選開啟來源網站）"></ul>
+      </section>
+      <section class="panel" aria-labelledby="mylist-title">
+        <div class="section-heading">
+          <div><h2 id="mylist-title">自選清單</h2><p id="mylist-status" class="hint" role="status">讀取中…</p></div>
+        </div>
+        <form id="mylist-form" class="mylist-form">
+          <label class="visually-hidden" for="mylist-input">新增股票（代號或名稱）</label>
+          <input id="mylist-input" list="mylist-options" placeholder="輸入代號或名稱，例如 2330 或 台積電" autocomplete="off" enterkeyhint="done">
+          <datalist id="mylist-options"></datalist>
+          <button type="submit">加入</button>
+        </form>
+        <p id="mylist-message" class="hint" role="status" aria-live="polite"></p>
+        <div class="table-wrap"><table id="mylist-table" class="intel-table mylist-table"></table></div>
+        <p class="hint">清單只存在這台裝置的瀏覽器中。價格為最近一個交易日的收盤價，每個交易日自動更新；點股票名稱可開啟 Yahoo 股市看即時報價。</p>
       </section>
     </div>
 

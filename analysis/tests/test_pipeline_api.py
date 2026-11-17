@@ -49,7 +49,7 @@ def test_pipeline_collects_trading_days_and_exports(monkeypatch, tmp_path):
     assert {s["code"] for s in f["streaks"]} == {"2330", "1815"}
     assert f["big_buys"][0]["code"] == "2330" and f["big_buys"][0]["net_value"] == 1_000_000_000
     q = json.loads((tmp_path / "quotes.json").read_text(encoding="utf-8"))
-    assert q["quotes"]["2330"] == ["台積電", "TWSE", 1000.0, None] and report["quotes"] == 2
+    assert q["quotes"]["2330"] == ["台積電", "TWSE", 1000.0, None] and report["quotes"] == 2 and q["dates"] == {}
     n = json.loads((tmp_path / "news.json").read_text(encoding="utf-8"))
     assert n["counts"] == {"利多": 1, "利空": 1, "中性": 0}
     assert {s["code"] for s in n["stocks"]} == {"2330", "2317"}

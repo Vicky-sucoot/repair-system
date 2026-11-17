@@ -20,7 +20,9 @@
 
 ## 畫面
 
-單頁式應用程式：畫面最下方的選項列依序為「定期定額、行情、外資動向、新聞情緒、觀察名單」，點選後只顯示該頁；網址會帶上頁面代號（例如 `#news`），並記住上次開啟的頁面。
+單頁式應用程式：畫面最下方的選項列依序為「定期定額、行情、外資動向、新聞情緒、觀察名單」，點選後只顯示該頁；網址會帶上頁面代號（例如 `#news`），並記住上次開啟的頁面。表頭與瀏覽器分頁標題會跟著目前的選項改變。
+
+「行情」頁下方有**自選清單**：輸入股票代號或名稱（上市、上櫃股票與 ETF）加入，顯示最近一個交易日的收盤價、漲跌與漲跌幅，點名稱可開啟 Yahoo 股市看即時報價。清單只存在這台裝置的瀏覽器；報價由每日流程從證交所、櫃買中心 OpenAPI 匯出成 `data/quotes.json`。
 
 ## 股價資料
 
@@ -55,7 +57,7 @@
 
 **啟用 Claude**：到 GitHub 儲存庫 **Settings → Secrets and variables → Actions → New repository secret**，名稱填 `ANTHROPIC_API_KEY`，值填 Anthropic API 金鑰。下一次排程（或在 Actions 頁面手動執行「外資動向與新聞情緒」）就會改用 Claude。每天約 2 次新聞分析加 1 次外資解讀，會產生 API 費用；沒有設定金鑰時，網站照常以關鍵字分析運作，只是不顯示 Claude 解讀。
 
-自動執行：GitHub Actions「外資動向與新聞情緒」在台灣時間每天 08:17（以最新新聞搭配前一交易日外資資料）與週一至週五 17:47（當日外資資料公布後）執行，結果寫入 `data/foreign.json`、`data/news.json`、`data/recommend.json`。
+自動執行：GitHub Actions「外資動向與新聞情緒」在台灣時間每天 08:17（以最新新聞搭配前一交易日外資資料）與週一至週五 17:47（當日外資資料公布後）執行，結果寫入 `data/foreign.json`、`data/news.json`、`data/recommend.json`、`data/quotes.json`。
 
 ### 本機執行
 
@@ -80,6 +82,7 @@ API：`GET /api/recommendations`（今日觀察名單，可帶 `top_n`、`big_va
 - `src/taifex.js`：解析期交所期貨每日行情 CSV（台指期夜盤）
 - `src/intel.js`：網站的外資動向、新聞情緒區塊
 - `src/tabs.js`：底部選項列與單頁切換
+- `src/mylist.js`：行情頁的自選清單
 - `analysis/`：Python 爬蟲（`crawlers/`）、SQLite（`db.py`）、外資篩選（`foreign_analysis.py`）、情緒分析（`sentiment.py`）、Claude 外資解讀（`insight.py`）、綜合評分（`recommend.py`）、每日流程（`pipeline.py`）、FastAPI（`api.py`）與測試（`tests/`）
 - `dashboard/app.py`：Streamlit 儀表板
 - `src/chart.js`：SVG 走勢圖

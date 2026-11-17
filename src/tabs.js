@@ -14,6 +14,11 @@
       t.setAttribute('aria-selected', String(active));
       t.tabIndex = active ? 0 : -1;
     });
+    // 表頭與瀏覽器分頁標題跟著目前的選項
+    const label = tabs.find(t => t.dataset.page === id)?.textContent.trim();
+    const heading = document.querySelector('header h1');
+    if (label && heading) heading.textContent = label;
+    if (label) document.title = label === '定期定額' ? '定期定額' : `${label}｜定期定額`;
     if (save) {
       try { localStorage.setItem(KEY, id); } catch { /* 無痕模式等情況忽略 */ }
       history.replaceState(null, '', `#${id}`);

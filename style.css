@@ -108,6 +108,21 @@ button:disabled { cursor: not-allowed; }
 #news-counts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 /* 頁面導覽與今日觀察名單 */
+/* 自選清單 */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.mylist-form { display: flex; gap: 8px; margin-top: 12px; }
+.mylist-form input { margin-top: 0; flex: 1; min-width: 0; }
+.mylist-form button { flex: none; }
+.mylist-table td:nth-child(n+3), .mylist-table th:nth-child(n+3) { text-align: right; }
+.mylist-table td.up { color: var(--up); }
+.mylist-table td.down { color: var(--down); }
+.mylist-table a { color: var(--accent); font-weight: 600; }
+@media (max-width: 580px) {
+  .mylist-table th:nth-child(4), .mylist-table td:nth-child(4) { display: none; } /* 手機隱藏漲跌點數，保留漲跌幅 */
+  .mylist-table th, .mylist-table td { padding: 6px 5px; }
+  .mylist-table .link-button { margin-left: 0; padding: 4px 8px; }
+}
+
 /* 底部選項列（單頁面切換） */
 .page-intro { margin: -12px 0 20px; color: var(--ink-2); }
 body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }

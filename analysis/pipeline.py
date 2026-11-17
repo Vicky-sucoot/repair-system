@@ -79,10 +79,14 @@ def import_news_json(conn, path: Path) -> None:
 
 
 def export_quotes(path: Path, stock_list: list[dict]) -> None:
-    """網站自選清單用的全市場最新收盤價：{代號: [名稱, 市場, 收盤價, 漲跌]}，格式精簡以縮小檔案。"""
+    """網站自選清單用的全市場最新收盤價：{代號: [名稱, 市場, 收盤價, 漲跌]}，格式精簡以縮小檔案。
+    上市、上櫃的資料日期可能不同（櫃買中心通常較早更新），分別記錄。"""
     quotes = {s["code"]: [s["name"], s["market"], s["close"], s.get("change")] for s in stock_list if s.get("close")}
-    dates = sorted({s["date"] for s in stock_list if s.get("date")})
-    export_json(path, {"updatedAt": now_tw().isoformat(timespec="seconds"), "date": dates[-1] if dates else None,
+    dates = {}
+    for s in stock_list:
+        if s.get("date"):
+            dates[s["market"]] = max(dates.get(s["market"], ""), s["date"])
+    export_json(path, {"updatedAt": now_tw().isoformat(timespec="seconds"), "dates": dates,
                        "source": "臺灣證券交易所、證券櫃檯買賣中心", "quotes": quotes})
 
 
