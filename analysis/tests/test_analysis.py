@@ -24,18 +24,25 @@ def test_analyze_streaks_and_big_trades():
         rows.append(row(d, "2330", 1_000_000))            # 連買 5 天
         rows.append(row(d, "2303", -500_000 if i < 2 else 2_000_000))  # 連買 3 天
         rows.append(row(d, "1101", 100_000 if i < 4 else -3_000_000))  # 最後一天賣超
+        rows.append(row(d, "2002", -200_000))             # 連賣 5 天
+        rows.append(row(d, "2603", 300_000 if i < 2 else -1_000_000))  # 連賣 3 天
     rows.append(row(DAYS[-1], "1815", 6_145_000, market="TPEx"))     # 只有最後一天，買超 1 天
-    prices = {"2330": 1000.0, "2303": 50.0, "1101": 40.0, "1815": 55.0}
+    prices = {"2330": 1000.0, "2303": 50.0, "1101": 40.0, "1815": 55.0, "2002": 20.0, "2603": 200.0}
     r = analyze(rows, prices, min_days=3, big_value=5e8, top_n=10)
     assert r["date"] == "2026-11-16" and r["dates"] == DAYS
     assert [(s["code"], s["streak_days"]) for s in r["streaks"]] == [("2330", 5), ("2303", 3)]
     assert r["streaks"][0]["streak_shares"] == 5_000_000
+    # 連續賣超：天數多的在前；只賣 1 天的 1101 不列入
+    assert [(s["code"], s["sell_streak_days"]) for s in r["sell_streaks"]] == [("2002", 5), ("2603", 3)]
+    assert r["sell_streaks"][0]["sell_streak_shares"] == -1_000_000
+    assert r["sell_streaks"][1]["streak_days"] == 0
     # 大買依金額排序：2330 10 億 > 1815 3.38 億 > 2303 1 億
     assert [s["code"] for s in r["big_buys"]] == ["2330", "1815", "2303"]
     assert r["big_buys"][0]["is_big"] is True and r["big_buys"][1]["is_big"] is False
-    assert r["big_sells"][0]["code"] == "1101" and r["big_sells"][0]["net_value"] == -120_000_000
-    assert r["big_sells"][0]["net_lots"] == -3000
-    assert r["counts"] == {"stocks": 4, "buy": 3, "sell": 1, "streaks": 2, "big_buy": 1, "big_sell": 0}
+    assert r["big_sells"][0]["code"] == "2603" and r["big_sells"][0]["net_value"] == -200_000_000
+    assert r["big_sells"][1]["code"] == "1101" and r["big_sells"][1]["net_value"] == -120_000_000
+    assert r["big_sells"][1]["net_lots"] == -3000
+    assert r["counts"] == {"stocks": 6, "buy": 3, "sell": 3, "streaks": 2, "sell_streaks": 2, "big_buy": 1, "big_sell": 0}
 
 
 def test_analyze_without_price_and_empty():

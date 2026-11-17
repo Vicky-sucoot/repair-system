@@ -47,12 +47,13 @@ function renderFlowTable(selector, kind, data, view) {
   const rows = data[view] || [];
   const thead = el('thead');
   const hr = el('tr');
-  ['代號', '名稱', '買賣超(張)', '金額(億)', '連買'].forEach(h => hr.append(el('th', h)));
+  ['代號', '名稱', '買賣超(張)', '金額(億)', '連續'].forEach(h => hr.append(el('th', h)));
   thead.append(hr);
   const tbody = el('tbody');
   if (!rows.length) {
     const tr = el('tr');
-    const td = el('td', view === 'streaks' ? `今日沒有連續買超 ${data.streak_min_days} 天以上的個股。` : '沒有資料。', 'hint');
+    const empty = { streaks: '連續買超', sell_streaks: '連續賣超' }[view];
+    const td = el('td', empty ? `今日沒有${empty} ${data.streak_min_days} 天以上的個股。` : '沒有資料。', 'hint');
     td.colSpan = 5;
     tr.append(td);
     tbody.append(tr);
@@ -63,7 +64,8 @@ function renderFlowTable(selector, kind, data, view) {
     if (r.is_big) name.append(' ', el('span', r.net_shares > 0 ? '大買' : '大賣', `flag ${tone(r.net_shares)}`));
     if (r.market === 'TPEx') name.append(' ', el('span', '櫃', 'flag'));
     tr.append(el('td', r.code), name, el('td', lots(r.net_lots), tone(r.net_lots)), el('td', yi(r.net_value), tone(r.net_value ?? 0)),
-      el('td', r.streak_days ? `${r.streak_days} 天` : '—'));
+      el('td', r.streak_days ? `買 ${r.streak_days} 天` : r.sell_streak_days ? `賣 ${r.sell_streak_days} 天` : '—',
+        r.streak_days ? 'up' : r.sell_streak_days ? 'down' : ''));
     tbody.append(tr);
   }
   table.replaceChildren(thead, tbody);
@@ -183,7 +185,7 @@ async function loadIntel() {
     foreignData = await loadJson('./data/foreign.json');
     const c = foreignData.counts || {};
     foreignStatus.className = 'hint';
-    foreignStatus.textContent = `${foreignData.date} 外資及陸資買賣超・買超 ${c.buy ?? 0} 家、賣超 ${c.sell ?? 0} 家・連買 ${foreignData.streak_min_days} 天以上 ${c.streaks ?? 0} 家・大買／大賣門檻 ${(foreignData.big_trade_value / 1e8).toFixed(0)} 億元・來源：${foreignData.source}`;
+    foreignStatus.textContent = `${foreignData.date} 外資及陸資買賣超・買超 ${c.buy ?? 0} 家、賣超 ${c.sell ?? 0} 家・連買 ${foreignData.streak_min_days} 天以上 ${c.streaks ?? 0} 家、連賣 ${c.sell_streaks ?? 0} 家・大買／大賣門檻 ${(foreignData.big_trade_value / 1e8).toFixed(0)} 億元・來源：${foreignData.source}`;
   } catch (error) {
     foreignStatus.className = 'error';
     foreignStatus.textContent = `無法取得外資資料：${error.message}`;
@@ -211,7 +213,7 @@ async function loadIntel() {
     trustData = await loadJson('./data/trust.json');
     const c = trustData.counts || {};
     trustStatus.className = 'hint';
-    trustStatus.textContent = `${trustData.date} 投信買賣超・買超 ${c.buy ?? 0} 家、賣超 ${c.sell ?? 0} 家・連買 ${trustData.streak_min_days} 天以上 ${c.streaks ?? 0} 家・大買／大賣門檻 ${(trustData.big_trade_value / 1e8).toFixed(0)} 億元・來源：${trustData.source}`;
+    trustStatus.textContent = `${trustData.date} 投信買賣超・買超 ${c.buy ?? 0} 家、賣超 ${c.sell ?? 0} 家・連買 ${trustData.streak_min_days} 天以上 ${c.streaks ?? 0} 家、連賣 ${c.sell_streaks ?? 0} 家・大買／大賣門檻 ${(trustData.big_trade_value / 1e8).toFixed(0)} 億元・來源：${trustData.source}`;
   } catch (error) {
     trustStatus.className = 'error';
     trustStatus.textContent = `無法取得投信資料：${error.message}`;

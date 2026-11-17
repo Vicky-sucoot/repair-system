@@ -28,7 +28,7 @@ class ForeignInsight(BaseModel):
 
 
 SYSTEM_PROMPT = (
-    "你是台股籌碼與消息面分析助理。根據提供的外資及陸資買賣超統計（連續買超、單日大買、單日大賣，"
+    "你是台股籌碼與消息面分析助理。根據提供的外資及陸資買賣超統計（連續買超、連續賣超、單日大買、單日大賣，"
     "金額以最新收盤價估算）與近期新聞情緒彙整，寫出給一般投資人看的繁體中文解讀。"
     "只能使用提供的資料，不要引用外部資訊或預測股價；個股代號必須來自提供的資料。"
     "語氣客觀，不提供買賣建議。"
@@ -36,7 +36,7 @@ SYSTEM_PROMPT = (
 
 
 def _compact(rows: list[dict], n: int = 15) -> list[dict]:
-    keys = ("code", "name", "market", "net_lots", "net_value", "streak_days", "is_big")
+    keys = ("code", "name", "market", "net_lots", "net_value", "streak_days", "sell_streak_days", "is_big")
     return [{k: r.get(k) for k in keys} for r in rows[:n]]
 
 
@@ -46,6 +46,7 @@ def build_prompt(foreign: dict, news_stocks: list[dict], news_counts: dict) -> s
         "counts": foreign.get("counts"),
         "streak_min_days": foreign.get("streak_min_days"),
         "streaks": _compact(foreign.get("streaks") or []),
+        "sell_streaks": _compact(foreign.get("sell_streaks") or []),
         "big_buys": _compact(foreign.get("big_buys") or []),
         "big_sells": _compact(foreign.get("big_sells") or []),
         "news_counts": news_counts,
@@ -78,7 +79,7 @@ def generate(foreign: dict, news_stocks: list[dict], news_counts: dict, client=N
     if response.stop_reason == "refusal" or response.parsed_output is None:
         return None
     insight = response.parsed_output
-    known = {r["code"]: r["name"] for key in ("streaks", "big_buys", "big_sells") for r in foreign.get(key) or []}
+    known = {r["code"]: r["name"] for key in ("streaks", "sell_streaks", "big_buys", "big_sells") for r in foreign.get(key) or []}
     known.update({s["code"]: s["name"] for s in news_stocks})
     return {
         "summary": insight.summary,

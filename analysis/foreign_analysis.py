@@ -1,4 +1,4 @@
-"""外資動向篩選：連續買超、單日大買／大賣。"""
+"""外資、投信動向篩選：連續買超、連續賣超、單日大買／大賣。"""
 from __future__ import annotations
 
 from collections import defaultdict
@@ -42,7 +42,8 @@ def stock_flows(rows: list[dict], prices: dict[str, float | None] | None = None)
             "price": price, "net_value": round(value) if value is not None else None,
             "streak_days": streak,
             "streak_shares": sum(nets[len(nets) - streak:]) if streak else 0,
-            "sell_streak_days": streak_length(nets, -1),
+            "sell_streak_days": (sell := streak_length(nets, -1)),
+            "sell_streak_shares": sum(nets[len(nets) - sell:]) if sell else 0,
         })
     return dates, flows
 
@@ -55,10 +56,13 @@ def analyze(rows: list[dict], prices: dict[str, float | None] | None = None, *,
     """
     dates, today = stock_flows(rows, prices)
     if not dates:
-        return {"date": None, "dates": [], "streaks": [], "big_buys": [], "big_sells": []}
+        return {"date": None, "dates": [], "streaks": [], "sell_streaks": [], "big_buys": [], "big_sells": []}
     latest = dates[-1]
     streaks = sorted((s for s in today if s["streak_days"] >= min_days),
                      key=lambda s: (s["streak_days"], s["net_value"] or s["net_shares"]), reverse=True)
+    # 連續賣超：天數多的在前，同天數賣超金額大的在前
+    sell_streaks = sorted((s for s in today if s["sell_streak_days"] >= min_days),
+                          key=lambda s: (-s["sell_streak_days"], s["net_value"] or s["net_shares"]))
 
     def size(s: dict) -> float:
         return s["net_value"] if s["net_value"] is not None else 0
@@ -70,7 +74,8 @@ def analyze(rows: list[dict], prices: dict[str, float | None] | None = None, *,
     return {
         "date": latest, "dates": dates,
         "streak_min_days": min_days, "big_trade_value": big_value,
-        "streaks": streaks[:top_n], "big_buys": buys[:top_n], "big_sells": sells[:top_n],
+        "streaks": streaks[:top_n], "sell_streaks": sell_streaks[:top_n], "big_buys": buys[:top_n], "big_sells": sells[:top_n],
         "counts": {"stocks": len(today), "buy": len(buys), "sell": len(sells), "streaks": len(streaks),
+                   "sell_streaks": len(sell_streaks),
                    "big_buy": sum(1 for s in buys if s["is_big"]), "big_sell": sum(1 for s in sells if s["is_big"])},
     }
