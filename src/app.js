@@ -455,7 +455,7 @@ async function loadPrices() {
     prices = data;
     const updated = new Date(data.updatedAt);
     const ageDays = (Date.now() - updated.getTime()) / 86400000;
-    status.textContent = `資料來源：Yahoo Finance、臺灣期貨交易所・每個交易日自動更新・更新於 ${updated.toLocaleString('zh-TW', { hour12: false })}${ageDays > 4 ? '（資料可能已過期）' : ''}`;
+    status.textContent = `資料來源：${data.source || '臺灣證券交易所、臺灣期貨交易所、Yahoo Finance'}・每個交易日自動更新・更新於 ${updated.toLocaleString('zh-TW', { hour12: false })}${ageDays > 4 ? '（資料可能已過期）' : ''}`;
     if (ageDays > 4) status.className = 'error';
     renderQuotes();
   } catch (error) {

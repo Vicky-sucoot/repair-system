@@ -35,3 +35,16 @@ test('期交所查詢參數', () => {
   assert.equal(body.get('queryEndDate'), '2026/11/20');
   assert.equal(body.get('commodity_id'), 'TX');
 });
+
+// 取自期交所 dailyFXRateDown 實際回應（已截短）
+test('解析期交所每日外幣參考匯率', async () => {
+  const { parseFxCsv, fxDataDownBody } = await import('../src/taifex.js');
+  const csv = `日期,美元／新台幣,人民幣／新台幣,歐元／美元,美元／日幣
+2010/09/01,32.027,-,1.2699,84.37
+2026/11/17,32.85,4.927861,1.1001,159.26
+2026/11/18,-,-,-,-
+`;
+  assert.deepEqual(parseFxCsv(csv), [['2010-09-01', 32.027], ['2026-11-17', 32.85]]);
+  assert.throws(() => parseFxCsv('<html>'), /不是匯率 CSV/);
+  assert.equal(new URLSearchParams(fxDataDownBody('2026-11-01', '2026-11-30')).get('queryStartDate'), '2026/11/01');
+});

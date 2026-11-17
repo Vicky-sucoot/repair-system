@@ -1,4 +1,4 @@
-name: probe fx and voo
+name: probe new price sources
 on:
   push:
     branches: ['claude/**']
@@ -6,35 +6,30 @@ on:
 jobs:
   probe:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: cp data/prices.json /tmp/old.json
+      - run: time node scripts/fetch-prices.mjs
       - run: |
-          python3 - <<'PY'
-          import urllib.request, urllib.parse
-          UA = 'Mozilla/5.0 (compatible; tw-market-intel/1.0)'
-          def get(url, data=None, t=60):
-              try:
-                  body = urllib.parse.urlencode(data).encode() if data else None
-                  r = urllib.request.urlopen(urllib.request.Request(url, data=body, headers={'User-Agent': UA}), timeout=t)
-                  raw = r.read()
-                  for enc in ('utf-8', 'big5', 'cp950'):
-                      try: return r.status, raw.decode(enc)
-                      except UnicodeDecodeError: pass
-                  return r.status, raw.decode('utf-8', 'replace')
-              except Exception as e:
-                  return 'ERR', str(e)
-          tries = [
-            ('GET', 'https://fred.stlouisfed.org/graph/fredgraph.csv?id=DEXTAUS', None),
-            ('GET', 'https://www.taifex.com.tw/cht/3/dailyFXRate', None),
-            ('POST', 'https://www.taifex.com.tw/cht/3/dailyFXRateDown', {'queryStartDate': '2026/11/01', 'queryEndDate': '2026/11/17'}),
-            ('POST', 'https://www.taifex.com.tw/cht/3/dailyFXRateDown', {'queryStartDate': '2010/09/01', 'queryEndDate': '2010/09/30'}),
-            ('GET', 'https://investor.vanguard.com/investment-products/etfs/profile/api/VOO/price', None),
-            ('GET', 'https://investor.vanguard.com/investment-products/etfs/profile/api/VOO/price-history', None),
-            ('GET', 'https://investor.vanguard.com/investment-products/etfs/profile/api/VOO/distribution', None),
-            ('GET', 'https://investor.vanguard.com/investment-products/etfs/profile/voo', None),
-          ]
-          for m, url, data in tries:
-              st, txt = get(url, data if m == 'POST' else None)
-              print('=====', m, url, data, st, len(txt))
-              lines = txt.splitlines()
-              print('\n'.join(lines[:6])[:900]); print('...', '\n'.join(lines[-3:])[:400])
-          PY
+          node -e "
+          const o = require('/tmp/old.json'), n = require('./data/prices.json');
+          console.log('source:', n.source);
+          for (const k of ['0050.TW', 'VOO', 'TWD=X']) {
+            const a = o.symbols[k], b = n.symbols[k];
+            console.log(k, b.source, 'n', b.dates.length, b.dates[0], '->', b.dates.at(-1), 'last', b.close.at(-1), '| old n', a.dates.length, 'last', a.close.at(-1));
+            for (const d of ['2010-09-10', '2015-06-01', '2020-03-19', '2025-06-10', '2025-06-18', '2026-11-13']) {
+              const ia = a.dates.indexOf(d), ib = b.dates.indexOf(d);
+              console.log('   ', d, 'old', ia >= 0 ? a.close[ia] : '-', 'new', ib >= 0 ? b.close[ib] : '-');
+            }
+            if (b.dividends.length) console.log('   div new', b.dividends.length, JSON.stringify(b.dividends.slice(-4)), '| old', a.dividends.length, JSON.stringify(a.dividends.slice(-4)));
+            if (b.splits) console.log('   splits', JSON.stringify(b.splits));
+          }
+          const t = n.indices.TWII; console.log('TWII', t.source, t.dates.length, t.dates.at(-1), t.close.at(-1));
+          console.log('NIGHT', JSON.stringify(n.indices.TX_NIGHT.series.at(-1)));
+          "
+          echo '--- second run (incremental) ---'
+          time node scripts/fetch-prices.mjs

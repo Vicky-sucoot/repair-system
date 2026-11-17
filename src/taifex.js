@@ -56,3 +56,18 @@ export function futDataDownBody(start, end, commodity = 'TX') {
   const fmt = d => `${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}`;
   return new URLSearchParams({ down_type: '1', commodity_id: commodity, queryStartDate: fmt(start), queryEndDate: fmt(end) }).toString();
 }
+
+/** 期交所每日外幣參考匯率 CSV（dailyFXRateDown）→ [[日期, 美元兌新台幣]]。 */
+export function parseFxCsv(text, column = '美元／新台幣') {
+  const lines = String(text).replace(/^﻿/, '').split(/\r?\n/).filter(line => line.trim());
+  if (!lines.length || !lines[0].includes('日期')) throw new Error('期交所回應不是匯率 CSV');
+  const header = lines[0].split(',').map(h => h.trim());
+  const ci = header.indexOf(column);
+  if (ci < 0) throw new Error(`匯率 CSV 沒有「${column}」欄位`);
+  return lines.slice(1).map(line => line.split(',')).map(cells => [cells[0].trim().replaceAll('/', '-'), Number(cells[ci])])
+    .filter(([d, v]) => /^\d{4}-\d{2}-\d{2}$/.test(d) && Number.isFinite(v) && v > 0);
+}
+
+export function fxDataDownBody(start, end) {
+  return new URLSearchParams({ queryStartDate: start.replaceAll('-', '/'), queryEndDate: end.replaceAll('-', '/') }).toString();
+}
