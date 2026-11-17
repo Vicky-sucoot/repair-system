@@ -1,28 +1,43 @@
-"""美股、日股收盤價（網站自選清單用）。
+"""美股、日股代號清單（網站自選清單用，不含價格）。
 
-- 美股範圍：S&P 500 成分股（維基百科）＋常見 ETF 與非 S&P 500 熱門股。
-- 日股範圍：日經 225 成分股（日經官方成分股頁，日文名稱）＋常見日股 ETF。
-- 報價：Yahoo Finance spark API，一次 20 檔；最新收盤與前一交易日收盤計算漲跌。
+Yahoo Finance、Stooq 等報價來源的 robots.txt 都禁止程式自動抓取，因此美股、日股只提供代號與名稱，
+使用者點名稱開啟 Yahoo 頁面查看報價。代號清單來源（皆允許程式讀取）：
+- 美股：S&P 500 成分股（維基百科）＋常見 ETF 與非 S&P 500 熱門股（固定清單）。
+- 日股：日經 225 成分股（日經官方成分股頁，日文名稱）＋常見日股 ETF（固定清單）。
 """
 from __future__ import annotations
 
 import io
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from .. import http
 
 SP500_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
 NIKKEI_URL = "https://indexes.nikkei.co.jp/nkave/index/component?idx=nk225"
-SPARK_URL = "https://query1.finance.yahoo.com/v7/finance/spark"
-BATCH = 20
 
-# 非 S&P 500 但台灣投資人常看的美股與 ETF
-US_EXTRA = ["VOO", "SPY", "IVV", "QQQ", "QQQM", "VTI", "VT", "VXUS", "VEA", "VWO", "SMH", "SOXX", "DIA", "SCHD", "VYM",
-            "VIG", "BND", "TLT", "IEF", "SHY", "GLD", "SLV", "VNQ", "ARKK", "TQQQ", "SOXL", "SQQQ", "EWJ", "EWT",
-            "TSM", "ASML", "ARM", "PDD", "BABA", "MELI", "SHOP", "SONY", "TM", "NVO", "SAP", "COIN", "MSTR", "SNOW", "U"]
-# 常見日股 ETF
-JP_EXTRA = ["1321.T", "1306.T", "1330.T", "1570.T", "1655.T", "2558.T"]
+# 非 S&P 500 但台灣投資人常看的美股與 ETF（名稱固定）
+US_EXTRA = {
+    "VOO": "Vanguard S&P 500 ETF", "SPY": "SPDR S&P 500 ETF Trust", "IVV": "iShares Core S&P 500 ETF",
+    "QQQ": "Invesco QQQ Trust", "QQQM": "Invesco NASDAQ 100 ETF", "VTI": "Vanguard Total Stock Market ETF",
+    "VT": "Vanguard Total World Stock ETF", "VXUS": "Vanguard Total International Stock ETF",
+    "VEA": "Vanguard FTSE Developed Markets ETF", "VWO": "Vanguard FTSE Emerging Markets ETF",
+    "SMH": "VanEck Semiconductor ETF", "SOXX": "iShares Semiconductor ETF", "DIA": "SPDR Dow Jones Industrial Average ETF",
+    "SCHD": "Schwab U.S. Dividend Equity ETF", "VYM": "Vanguard High Dividend Yield ETF", "VIG": "Vanguard Dividend Appreciation ETF",
+    "BND": "Vanguard Total Bond Market ETF", "TLT": "iShares 20+ Year Treasury Bond ETF", "IEF": "iShares 7-10 Year Treasury Bond ETF",
+    "SHY": "iShares 1-3 Year Treasury Bond ETF", "GLD": "SPDR Gold Shares", "SLV": "iShares Silver Trust",
+    "VNQ": "Vanguard Real Estate ETF", "ARKK": "ARK Innovation ETF", "TQQQ": "ProShares UltraPro QQQ",
+    "SOXL": "Direxion Daily Semiconductor Bull 3X Shares", "SQQQ": "ProShares UltraPro Short QQQ",
+    "EWJ": "iShares MSCI Japan ETF", "EWT": "iShares MSCI Taiwan ETF",
+    "TSM": "Taiwan Semiconductor Manufacturing (ADR)", "ASML": "ASML Holding", "ARM": "Arm Holdings",
+    "PDD": "PDD Holdings", "BABA": "Alibaba Group (ADR)", "MELI": "MercadoLibre", "SHOP": "Shopify",
+    "SONY": "Sony Group (ADR)", "TM": "Toyota Motor (ADR)", "NVO": "Novo Nordisk (ADR)", "SAP": "SAP (ADR)",
+    "SNOW": "Snowflake", "U": "Unity Software",
+}
+# 常見日股 ETF（名稱固定）
+JP_EXTRA = {
+    "1321.T": "NEXT FUNDS 日経225連動型上場投信", "1306.T": "NEXT FUNDS TOPIX連動型上場投信",
+    "1330.T": "上場インデックスファンド225", "1570.T": "NEXT FUNDS 日経平均レバレッジ・インデックス連動型上場投信",
+    "1655.T": "iシェアーズ S&P 500 米国株 ETF", "2558.T": "MAXIS 米国株式(S&P500)上場投信",
+}
 
 # 中文常用名稱（可用中文搜尋）
 ALIASES = {
@@ -41,7 +56,7 @@ ALIASES = {
 
 
 def _read_html(text: str):
-    import pandas as pd  # 延後載入，只有抓美日股時才需要
+    import pandas as pd  # 延後載入，只有抓美日股清單時才需要
 
     return pd.read_html(io.StringIO(text))
 
@@ -51,7 +66,7 @@ def parse_sp500(html: str) -> list[dict]:
     for table in _read_html(html):
         cols = [str(c) for c in table.columns]
         if "Symbol" in cols and "Security" in cols:
-            return [{"symbol": str(r["Symbol"]).strip().replace(".", "-"), "name": str(r["Security"]).strip(), "market": "US"}
+            return [{"code": str(r["Symbol"]).strip().replace(".", "-"), "name": str(r["Security"]).strip(), "market": "US"}
                     for _, r in table.iterrows() if str(r["Symbol"]).strip()]
     return []
 
@@ -65,74 +80,20 @@ def parse_nikkei(html: str) -> list[dict]:
             for _, r in table.iterrows():
                 code = str(r["コード"]).strip()
                 if code and code.lower() != "nan":
-                    out.append({"symbol": f"{code}.T", "name": str(r["銘柄名"]).strip(), "market": "JP"})
-    return out
-
-
-def parse_spark(payload: dict) -> dict[str, dict]:
-    """Yahoo spark：回傳 {代號: {name, currency, close, change, date}}。"""
-    out = {}
-    for item in (payload.get("spark") or {}).get("result") or []:
-        try:
-            resp = item["response"][0]
-            meta = resp["meta"]
-            closes = resp["indicators"]["quote"][0]["close"]
-            stamps = resp["timestamp"]
-        except (KeyError, IndexError, TypeError):
-            continue
-        points = [(t, c) for t, c in zip(stamps, closes) if c is not None]
-        if not points:
-            continue
-        last_t, last = points[-1]
-        prev = points[-2][1] if len(points) > 1 else None
-        tz = ZoneInfo(meta.get("exchangeTimezoneName") or "UTC")
-        out[item["symbol"]] = {
-            "name": meta.get("longName") or meta.get("shortName") or item["symbol"],
-            "currency": meta.get("currency"),
-            "close": round(last, 4),
-            "change": round(last - prev, 4) if prev is not None else None,
-            "date": datetime.fromtimestamp(last_t, tz).date().isoformat(),
-        }
-    return out
-
-
-def universe() -> list[dict]:
-    """美股與日股的代號清單；單一來源失敗時仍保留其他來源與固定清單。"""
-    items: dict[str, dict] = {}
-    for url, parser in ((SP500_URL, parse_sp500), (NIKKEI_URL, parse_nikkei)):
-        try:
-            for it in parser(http.get(url, min_interval=1.0).text):
-                items[it["symbol"]] = it
-        except Exception as error:
-            print(f"成分股清單下載失敗（{url}）：{error}")
-    for sym in US_EXTRA:
-        items.setdefault(sym, {"symbol": sym, "name": None, "market": "US"})
-    for sym in JP_EXTRA:
-        items.setdefault(sym, {"symbol": sym, "name": None, "market": "JP"})
-    return list(items.values())
-
-
-def fetch_quotes(symbols: list[dict]) -> list[dict]:
-    """回傳 [{code, name, market, close, change, date, alias}]；日股優先使用日經的日文名稱。"""
-    out = []
-    for i in range(0, len(symbols), BATCH):
-        batch = symbols[i:i + BATCH]
-        try:
-            resp = http.get(SPARK_URL, params={"symbols": ",".join(s["symbol"] for s in batch), "range": "5d", "interval": "1d"},
-                            min_interval=0.5)
-            quotes = parse_spark(resp.json())
-        except Exception as error:
-            print(f"美日股報價下載失敗（第 {i // BATCH + 1} 批）：{error}")
-            continue
-        for s in batch:
-            q = quotes.get(s["symbol"])
-            if not q:
-                continue
-            name = s["name"] if s["market"] == "JP" and s.get("name") else q["name"]
-            out.append({"code": s["symbol"], "name": name, "market": s["market"], "close": q["close"],
-                        "change": q["change"], "date": q["date"], "alias": ALIASES.get(s["symbol"])})
+                    out.append({"code": f"{code}.T", "name": str(r["銘柄名"]).strip(), "market": "JP"})
     return out
 
 
 def fetch_all() -> list[dict]:
-    return fetch_quotes(universe())
+    """回傳 [{code, name, market, alias}]（不含價格）；單一來源失敗時仍保留其他來源與固定清單。"""
+    items: dict[str, dict] = {}
+    for url, parser in ((SP500_URL, parse_sp500), (NIKKEI_URL, parse_nikkei)):
+        try:
+            for it in parser(http.get(url, min_interval=1.0).text):
+                items[it["code"]] = it
+        except Exception as error:
+            print(f"成分股清單下載失敗（{url}）：{error}")
+    for extra, market in ((US_EXTRA, "US"), (JP_EXTRA, "JP")):
+        for code, name in extra.items():
+            items.setdefault(code, {"code": code, "name": name, "market": market})
+    return [{**it, "alias": ALIASES.get(it["code"])} for it in items.values()]

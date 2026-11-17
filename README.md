@@ -25,9 +25,10 @@
 「行情」頁下方有**自選清單**：先選市場（台股／美股／日股），再輸入代號或名稱加入，顯示最近一個交易日的收盤價、漲跌與漲跌幅，點名稱可開啟 Yahoo 看即時報價。清單只存在這台裝置的瀏覽器。
 
 - **台股**：上市、上櫃股票與 ETF（證交所、櫃買中心 OpenAPI）。
-- **美股**：S&P 500 成分股（維基百科）＋常見 ETF 與熱門股（VOO、QQQ、TSM、ASML…），報價來自 Yahoo Finance；常見個股可用中文搜尋（蘋果、輝達、特斯拉…）。
-- **日股**：日經 225 成分股（日經官方成分股頁，日文名稱）＋常見日股 ETF（1321、1306…），報價來自 Yahoo Finance；輸入時不需加 `.T`。
-- 報價由每日流程匯出成 `data/quotes.json`；美股、日股當次下載失敗時沿用上一版資料。
+- **美股**：S&P 500 成分股（維基百科）＋常見 ETF 與熱門股（VOO、QQQ、TSM、ASML…）；常見個股可用中文搜尋（蘋果、輝達、特斯拉…）。
+- **日股**：日經 225 成分股（日經官方成分股頁，日文名稱）＋常見日股 ETF（1321、1306…）；輸入時不需加 `.T`。
+- **美股、日股不顯示價格**：Yahoo Finance、Stooq 等報價來源的 robots.txt 禁止程式自動抓取，因此只提供代號與名稱，點名稱開啟 Yahoo 頁面看報價。
+- 資料由每日流程匯出成 `data/quotes.json`；某市場當次下載失敗時沿用上一版資料。
 
 ## 股價資料
 
@@ -88,7 +89,7 @@ API：`GET /api/recommendations`（今日觀察名單，可帶 `top_n`、`big_va
 - `src/intel.js`：網站的外資動向、新聞情緒區塊
 - `src/tabs.js`：底部選項列與單頁切換
 - `src/mylist.js`：行情頁的自選清單（台股、美股、日股）
-- `analysis/crawlers/global_quotes.py`：美股、日股成分股清單與報價
+- `analysis/crawlers/global_quotes.py`：美股、日股代號清單（不含價格）
 - `analysis/`：Python 爬蟲（`crawlers/`）、SQLite（`db.py`）、外資篩選（`foreign_analysis.py`）、情緒分析（`sentiment.py`）、Claude 外資解讀（`insight.py`）、綜合評分（`recommend.py`）、每日流程（`pipeline.py`）、FastAPI（`api.py`）與測試（`tests/`）
 - `dashboard/app.py`：Streamlit 儀表板
 - `src/chart.js`：SVG 走勢圖

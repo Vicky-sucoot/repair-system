@@ -80,9 +80,10 @@ def import_news_json(conn, path: Path) -> None:
 
 def export_quotes(path: Path, stock_list: list[dict], global_list: list[dict] | None = None) -> None:
     """
-    網站自選清單用的最新收盤價：{代號: [名稱, 市場, 收盤價, 漲跌]}，格式精簡以縮小檔案。
-    市場：TWSE 上市、TPEx 上櫃、US 美股、JP 日股；各市場資料日期可能不同，分別記錄。
-    美股、日股這次沒抓到時，沿用上一版檔案中的資料。
+    網站自選清單用的資料：{代號: [名稱, 市場, 收盤價, 漲跌]}，格式精簡以縮小檔案。
+    市場：TWSE 上市、TPEx 上櫃（含最新收盤價，兩市場日期可能不同，分別記錄）；
+    US 美股、JP 日股只有代號與名稱，價格為 null（報價來源禁止程式抓取，網頁改連到 Yahoo 頁面）。
+    某市場這次沒抓到時，沿用上一版檔案中的資料。
     """
     previous = {}
     if path.exists():
@@ -90,8 +91,8 @@ def export_quotes(path: Path, stock_list: list[dict], global_list: list[dict] | 
             previous = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             previous = {}
-    rows = [s for s in stock_list if s.get("close")] + [s for s in (global_list or []) if s.get("close")]
-    quotes = {s["code"]: [s["name"], s["market"], s["close"], s.get("change")] for s in rows}
+    rows = [s for s in stock_list if s.get("close")] + list(global_list or [])
+    quotes = {s["code"]: [s["name"], s["market"], s.get("close"), s.get("change")] for s in rows}
     dates: dict[str, str] = {}
     for s in rows:
         if s.get("date"):
@@ -105,7 +106,7 @@ def export_quotes(path: Path, stock_list: list[dict], global_list: list[dict] | 
                 dates[market] = previous["dates"][market]
             aliases.update({c: a for c, a in (previous.get("aliases") or {}).items() if c in old})
     export_json(path, {"updatedAt": now_tw().isoformat(timespec="seconds"), "dates": dates,
-                       "source": "臺灣證券交易所、證券櫃檯買賣中心、Yahoo Finance（美股、日股）",
+                       "source": "臺灣證券交易所、證券櫃檯買賣中心；美股、日股代號來自維基百科 S&P 500 與日經 225 成分股",
                        "quotes": quotes, "aliases": aliases})
 
 
@@ -125,7 +126,7 @@ def run(days: int = HISTORY_DAYS, *, skip_foreign: bool = False, skip_news: bool
         global_list = global_quotes.fetch_all()
     except Exception as error:  # 美日股失敗不影響台股與其他流程
         global_list = []
-        report["errors"].append(f"美股、日股報價下載失敗：{error}")
+        report["errors"].append(f"美股、日股代號清單下載失敗：{error}")
     if stock_list or global_list:
         export_quotes(export_dir / "quotes.json", stock_list, global_list)
         report["quotes"] = len(stock_list) + len(global_list)

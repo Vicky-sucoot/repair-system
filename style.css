@@ -118,6 +118,7 @@ button:disabled { cursor: not-allowed; }
 .mylist-table td.up { color: var(--up); }
 .mylist-table td.down { color: var(--down); }
 .mylist-table a { color: var(--accent); font-weight: 600; }
+.mylist-table td.no-price { font-size: .78rem; white-space: normal; }
 .mylist-table td:nth-child(2) { white-space: normal; overflow-wrap: anywhere; min-width: 7em; } /* 美日股英文名稱較長，允許換行 */
 @media (max-width: 580px) {
   .mylist-table th:nth-child(4), .mylist-table td:nth-child(4) { display: none; } /* 手機隱藏漲跌點數，保留漲跌幅 */

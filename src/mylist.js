@@ -10,6 +10,8 @@
     US: '輸入代號或名稱，例如 AAPL、VOO 或 蘋果',
     JP: '輸入代號或名稱，例如 7203 或 トヨタ',
   };
+  // 美股、日股報價來源禁止程式抓取，只提供代號與名稱，點名稱看 Yahoo 報價
+  const NO_PRICE = ['US', 'JP'];
   let aliases = {};
   const MAX = 50;
   const $ = selector => document.querySelector(selector);
@@ -137,7 +139,7 @@
       const actions = el('td', '', 'row-actions');
       actions.append(remove);
       tr.append(el('td', shortCode(code)), nameCell,
-        close != null ? priceCell(close, q[1]) : el('td', '—'),
+        close != null ? priceCell(close, q[1]) : el('td', q && NO_PRICE.includes(q[1]) ? '點名稱看報價' : '—', 'hint no-price'),
         el('td', change != null ? `${change > 0 ? '+' : ''}${num(change)}` : '—', tone),
         el('td', pct != null ? `${pct > 0 ? '+' : ''}${(pct * 100).toFixed(2)}%` : '—', tone),
         actions);
@@ -169,7 +171,7 @@
     list.push(result.code);
     save();
     input.value = '';
-    message(`已加入 ${name}（${shown}）。`);
+    message(`已加入 ${name}（${shown}）。${NO_PRICE.includes(quotes[result.code][1]) ? '美股、日股不顯示價格，點名稱可開啟 Yahoo 看報價。' : ''}`);
     render();
   });
 
@@ -184,9 +186,8 @@
       const status = $('#mylist-status');
       status.className = 'hint';
       const d = data.dates || {};
-      const parts = [['上市', d.TWSE], ['上櫃', d.TPEx], ['美股', d.US], ['日股', d.JP]]
-        .filter(([, v]) => v).map(([k, v]) => `${k} ${v.slice(5)}`);
-      status.textContent = `收盤日期 ${parts.join('、') || '—'}・共 ${Object.keys(quotes).length} 檔可查詢`;
+      const parts = [['上市', d.TWSE], ['上櫃', d.TPEx]].filter(([, v]) => v).map(([k, v]) => `${k} ${v.slice(5)}`);
+      status.textContent = `台股收盤日期 ${parts.join('、') || '—'}・共 ${Object.keys(quotes).length} 檔可查詢・美股、日股只提供代號與名稱，點名稱看 Yahoo 報價`;
       fillOptions();
       render();
     })
