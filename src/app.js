@@ -522,13 +522,13 @@ function renderQuotes() {
     cards.push(quoteCard({ key: 'TX_NIGHT', short: '台指期夜盤', name: `近月 ${night.month.slice(0, 4)}/${night.month.slice(4)}`, value: twd.format(night.close), change: night.change ?? 0,
       detail: `${night.change > 0 ? '+' : ''}${night.change ?? '—'}（${format.percent(pct)}）`, date: `${night.date} 夜盤收盤` }));
   }
-  indexCard('SOX', '費城半導體', '費城半導體指數（美國）');
+  indexCard('SOX', '費城半導體', '美國・指數');
   const gold = prices.indices?.GOLD?.series?.at(-1);
   if (gold) {
     const pct = gold.changePct == null ? null : gold.changePct / 100;
-    cards.push(quoteCard({ key: 'GOLD', short: '黃金', name: '國際金價（美元／盎司）', value: `US$${indexNumber(gold.close)}`, change: gold.change ?? 0,
+    cards.push(quoteCard({ key: 'GOLD', short: '黃金', name: '美元／盎司', value: `US$${indexNumber(gold.close)}`, change: gold.change ?? 0,
       detail: gold.change == null ? '—' : `${gold.change >= 0 ? '+' : ''}${indexNumber(gold.change)}（${format.percent(pct)}）`,
-      date: `${gold.date} 期交所黃金期貨` }));
+      date: `${gold.date} 結算價` }));
   }
   const fx = prices.symbols[FX_SYMBOL];
   if (fx?.close?.length) {
