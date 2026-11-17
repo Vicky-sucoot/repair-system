@@ -1,4 +1,4 @@
-name: probe close dates
+name: probe tpex history
 on:
   push:
     branches: ['claude/**']
@@ -9,20 +9,30 @@ jobs:
     steps:
       - run: |
           python3 - <<'PY'
-          import json, urllib.request
+          import json, urllib.request, urllib.parse
           UA = 'Mozilla/5.0 (compatible; tw-market-intel/1.0)'
-          def get(url):
-              return json.loads(urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': UA}), timeout=30).read())
-          for d in ['115/11/13', '115/11/12', '115/10/01', '115/09/01']:
-              j = get(f'https://www.tpex.org.tw/web/stock/aftertrading/daily_close_quotes/stk_quote_result.php?l=zh-tw&d={d}')
-              rows = {r[0]: r[2] for r in j['tables'][0]['data']}
-              print('TPEx', d, 'resp date', j.get('date'), 'n', len(rows), {k: rows.get(k) for k in ('1815', '6147', '5347', '8069')})
-          for d in ['20261113', '20261112', '20261001', '20260901']:
-              j = get(f'https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date={d}&type=ALLBUT0999&response=json')
-              t = [t for t in j['tables'] if '每日收盤行情' in (t.get('title') or '')][0]
-              rows = {r[0]: r[8] for r in t['data']}
-              print('TWSE', d, 'resp date', j.get('date'), 'n', len(rows), {k: rows.get(k) for k in ('2330', '2317', '2885')})
-          for d in ['115/11/13', '115/10/01']:
-              j = get(f'https://www.tpex.org.tw/web/stock/3insti/qfii_trading/forgtr_result.php?l=zh-tw&t=D&type=buy&d={d}')
-              print('TPEx qfii', d, 'resp date', j['tables'][0].get('date'), j['tables'][0]['data'][:2])
+          def req(url, data=None):
+              r = urllib.request.Request(url, data=urllib.parse.urlencode(data).encode() if data else None, headers={'User-Agent': UA})
+              return urllib.request.urlopen(r, timeout=30).read().decode('utf-8', 'replace')
+          tries = [
+            ('GET', 'https://www.tpex.org.tw/web/stock/aftertrading/daily_close_quotes/stk_quote_result.php?l=zh-tw&o=json&d=115/10/01&s=0,asc,0', None),
+            ('GET', 'https://www.tpex.org.tw/web/stock/aftertrading/otc_quotes_no1430/stk_wn1430_result.php?l=zh-tw&o=json&d=115/10/01&se=EW&s=0,asc,0', None),
+            ('GET', 'https://www.tpex.org.tw/www/zh-tw/afterTrading/otc?date=2026%2F10%2F01&type=EW&response=json', None),
+            ('POST', 'https://www.tpex.org.tw/www/zh-tw/afterTrading/otc', {'date': '2026/10/01', 'type': 'EW', 'response': 'json'}),
+            ('POST', 'https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQ', {'date': '2026/10/01', 'response': 'json'}),
+          ]
+          for m, url, data in tries:
+              print('=====', m, url, data)
+              try:
+                  t = req(url, data if m == 'POST' else None)
+                  j = json.loads(t)
+                  print('top keys', list(j.keys())[:10], 'date', j.get('date') or j.get('reportDate'))
+                  for tb in (j.get('tables') or [])[:2]:
+                      rows = tb.get('data') or []
+                      print(' table', tb.get('title'), tb.get('date'), 'fields', (tb.get('fields') or [])[:4], 'n', len(rows))
+                      look = {r[0]: r[2] for r in rows if r and r[0] in ('1815', '6147', '5347')}
+                      print('  sample', look)
+                  if j.get('aaData'): print(' aaData', len(j['aaData']), j['aaData'][0][:4])
+              except Exception as e:
+                  print('ERR', type(e).__name__, str(e)[:120])
           PY
