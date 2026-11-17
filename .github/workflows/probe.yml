@@ -1,0 +1,19 @@
+name: probe sox gold
+on:
+  push:
+    branches: [claude/affectionate-volta-na1we6]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36'
+          for u in https://api.nasdaq.com/robots.txt https://www.nasdaq.com/robots.txt https://quote.cnbc.com/robots.txt https://rate.bot.com.tw/robots.txt https://www.cnbc.com/robots.txt; do
+            echo "=== $u"; curl -sS -m 20 -A "$UA" -w '\nHTTP %{http_code}\n' "$u" | head -60; done
+          for u in "https://api.nasdaq.com/api/quote/SOX/historical?assetclass=index&fromdate=2026-10-01&todate=2026-11-18&limit=5" \
+                   "https://api.nasdaq.com/api/quote/SOX/info?assetclass=index" \
+                   "https://api.nasdaq.com/api/quote/GC%3ACMX/historical?assetclass=commodities&fromdate=2026-10-01&todate=2026-11-18&limit=5" \
+                   "https://api.nasdaq.com/api/quote/GC%3ACMX/info?assetclass=commodities" \
+                   "https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=.SOX%7C%40GC.1&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json" \
+                   "https://rate.bot.com.tw/gold/csv/2026-11/TWD/0" ; do
+            echo "=== $u"; curl -sS -m 20 -A "$UA" -H 'Accept: application/json' -w '\nHTTP %{http_code}\n' "$u" | head -c 1500; echo; done
