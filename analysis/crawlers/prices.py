@@ -38,20 +38,33 @@ def _rows(tables: list[dict], title_has: str | None, code_field: str, close_fiel
     return closes
 
 
-def parse_twse_closes(payload: dict) -> dict[str, float]:
+def _response_day(payload: dict) -> str | None:
+    """回應中的資料日期，統一成 YYYYMMDD（證交所為西元，櫃買中心可能為西元或民國）。"""
+    raw = str(payload.get("date") or "").replace("/", "").replace("-", "").strip()
+    if len(raw) == 7 and raw.isdigit():  # 民國 1151113
+        return f"{int(raw[:3]) + 1911}{raw[3:]}"
+    return raw or None
+
+
+def parse_twse_closes(payload: dict, day: date | None = None) -> dict[str, float]:
     if payload.get("stat") != "OK":
         return {}
+    if day and _response_day(payload) != day.strftime("%Y%m%d"):
+        return {}  # 回應不是要求的日期，不能拿來回測
     return _rows(payload.get("tables"), "每日收盤行情", "證券代號", "收盤價")
 
 
-def parse_tpex_closes(payload: dict) -> dict[str, float]:
+def parse_tpex_closes(payload: dict, day: date | None = None) -> dict[str, float]:
+    # 櫃買中心此網址會忽略日期參數、永遠回傳最新一天；日期不符時整份捨棄，避免把同一價格當成歷史價格
+    if day and _response_day(payload) != day.strftime("%Y%m%d"):
+        return {}
     return _rows(payload.get("tables"), None, "代號", "收盤")
 
 
 def fetch_closes(day: date) -> dict[str, float]:
     """回傳 {代號: 收盤價}（上市＋上櫃）；任一市場失敗時拋出例外。"""
     twse = http.get(TWSE_URL, params={"date": day.strftime("%Y%m%d"), "type": "ALLBUT0999", "response": "json"}, min_interval=3.0)
-    closes = parse_twse_closes(twse.json())
+    closes = parse_twse_closes(twse.json(), day)
     tpex = http.get(TPEX_URL, params={"l": "zh-tw", "d": roc_date(day)}, min_interval=2.0)
-    closes.update(parse_tpex_closes(tpex.json()))
+    closes.update(parse_tpex_closes(tpex.json(), day))
     return closes

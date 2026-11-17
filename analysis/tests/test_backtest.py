@@ -99,3 +99,14 @@ def test_api_backtest(monkeypatch, tmp_path):
     body = TestClient(api.app).get("/api/backtest").json()
     assert body["price_days"] == 5 and body["combined"]["picks"] == 2
     assert set(body["foreign_only"]["summary"]) == {"buy", "sell"}
+
+
+def test_close_quotes_rejected_when_response_date_differs():
+    from datetime import date
+    tpex = {"date": "20261116", "tables": [{"fields": ["代號", "名稱", "收盤"], "data": [["1815", "富喬", "131.00"]]}]}
+    assert prices.parse_tpex_closes(tpex, date(2026, 11, 13)) == {}  # 要 11/13，卻回傳 11/16
+    assert prices.parse_tpex_closes(tpex, date(2026, 11, 16)) == {"1815": 131.0}
+    assert prices.parse_tpex_closes({**tpex, "date": "1151116"}, date(2026, 11, 16)) == {"1815": 131.0}  # 民國日期
+    twse = {"stat": "OK", "date": "20261112", "tables": [{"title": "每日收盤行情", "fields": ["證券代號", "收盤價"], "data": [["2330", "2,340.00"]]}]}
+    assert prices.parse_twse_closes(twse, date(2026, 11, 12)) == {"2330": 2340.0}
+    assert prices.parse_twse_closes(twse, date(2026, 11, 13)) == {}
