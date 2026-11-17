@@ -113,14 +113,23 @@ button:disabled { cursor: not-allowed; }
 .mylist-form { display: flex; gap: 8px; margin-top: 12px; }
 .mylist-form input { margin-top: 0; flex: 1; min-width: 0; }
 .mylist-form button { flex: none; }
+.mylist-form select { margin-top: 0; width: auto; flex: none; }
 .mylist-table td:nth-child(n+3), .mylist-table th:nth-child(n+3) { text-align: right; }
 .mylist-table td.up { color: var(--up); }
 .mylist-table td.down { color: var(--down); }
 .mylist-table a { color: var(--accent); font-weight: 600; }
+.mylist-table td.no-price { font-size: .78rem; white-space: normal; }
+.mylist-table td:nth-child(2) { white-space: normal; overflow-wrap: anywhere; min-width: 7em; } /* 美日股英文名稱較長，允許換行 */
 @media (max-width: 580px) {
   .mylist-table th:nth-child(4), .mylist-table td:nth-child(4) { display: none; } /* 手機隱藏漲跌點數，保留漲跌幅 */
   .mylist-table th, .mylist-table td { padding: 6px 5px; }
-  .mylist-table .link-button { margin-left: 0; padding: 4px 8px; }
+  .mylist-table .link-button { margin-left: 0; padding: 2px 6px; min-height: 32px; font-size: .75rem; }
+  .mylist-table td:nth-child(2) { min-width: 5.5em; }
+  .mylist-table .name-en { display: none; }
+}
+@media (max-width: 380px) {
+  .mylist-table .cur { display: none; }
+  .mylist-table th, .mylist-table td { padding: 6px 3px; }
 }
 
 /* 底部選項列（單頁面切換） */

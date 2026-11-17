@@ -34,6 +34,9 @@ def setup(monkeypatch, tmp_path):
         {"code": "2330", "name": "台積電", "market": "TWSE", "close": 1000.0},
         {"code": "2317", "name": "鴻海", "market": "TWSE", "close": 200.0}])
     monkeypatch.setattr(news, "fetch_all", lambda: (list(NEWS), ["鉅亨網：HTTP 500"]))
+    from analysis.crawlers import global_quotes
+    monkeypatch.setattr(global_quotes, "fetch_all", lambda: [
+        {"code": "AAPL", "name": "Apple Inc.", "market": "US", "alias": "蘋果"}])
     monkeypatch.setattr(pipeline, "now_tw", lambda: pipeline.datetime(2026, 11, 17, 18, 0, tzinfo=pipeline.TW))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     return tmp_path / "market.db"
@@ -49,7 +52,9 @@ def test_pipeline_collects_trading_days_and_exports(monkeypatch, tmp_path):
     assert {s["code"] for s in f["streaks"]} == {"2330", "1815"}
     assert f["big_buys"][0]["code"] == "2330" and f["big_buys"][0]["net_value"] == 1_000_000_000
     q = json.loads((tmp_path / "quotes.json").read_text(encoding="utf-8"))
-    assert q["quotes"]["2330"] == ["台積電", "TWSE", 1000.0, None] and report["quotes"] == 2 and q["dates"] == {}
+    assert q["quotes"]["2330"] == ["台積電", "TWSE", 1000.0, None] and report["quotes"] == 3
+    assert q["quotes"]["AAPL"] == ["Apple Inc.", "US", None, None] and q["aliases"] == {"AAPL": "蘋果"}
+    assert q["dates"] == {}
     n = json.loads((tmp_path / "news.json").read_text(encoding="utf-8"))
     assert n["counts"] == {"利多": 1, "利空": 1, "中性": 0}
     assert {s["code"] for s in n["stocks"]} == {"2330", "2317"}

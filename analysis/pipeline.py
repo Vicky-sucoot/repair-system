@@ -12,7 +12,7 @@ from pathlib import Path
 
 from . import db
 from .config import DB_PATH, EXPORT_DIR, HISTORY_DAYS, NEWS_KEEP_DAYS
-from .crawlers import foreign, news, stocks
+from .crawlers import foreign, global_quotes, news, stocks
 from .crawlers.news import TW
 from .foreign_analysis import analyze, stock_flows
 from . import recommend
@@ -78,16 +78,36 @@ def import_news_json(conn, path: Path) -> None:
             db.save_analysis(conn, item["id"], item)
 
 
-def export_quotes(path: Path, stock_list: list[dict]) -> None:
-    """網站自選清單用的全市場最新收盤價：{代號: [名稱, 市場, 收盤價, 漲跌]}，格式精簡以縮小檔案。
-    上市、上櫃的資料日期可能不同（櫃買中心通常較早更新），分別記錄。"""
-    quotes = {s["code"]: [s["name"], s["market"], s["close"], s.get("change")] for s in stock_list if s.get("close")}
-    dates = {}
-    for s in stock_list:
+def export_quotes(path: Path, stock_list: list[dict], global_list: list[dict] | None = None) -> None:
+    """
+    網站自選清單用的資料：{代號: [名稱, 市場, 收盤價, 漲跌]}，格式精簡以縮小檔案。
+    市場：TWSE 上市、TPEx 上櫃（含最新收盤價，兩市場日期可能不同，分別記錄）；
+    US 美股、JP 日股只有代號與名稱，價格為 null（報價來源禁止程式抓取，網頁改連到 Yahoo 頁面）。
+    某市場這次沒抓到時，沿用上一版檔案中的資料。
+    """
+    previous = {}
+    if path.exists():
+        try:
+            previous = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            previous = {}
+    rows = [s for s in stock_list if s.get("close")] + list(global_list or [])
+    quotes = {s["code"]: [s["name"], s["market"], s.get("close"), s.get("change")] for s in rows}
+    dates: dict[str, str] = {}
+    for s in rows:
         if s.get("date"):
             dates[s["market"]] = max(dates.get(s["market"], ""), s["date"])
+    aliases = {s["code"]: s["alias"] for s in (global_list or []) if s.get("alias") and s["code"] in quotes}
+    for market in ("TWSE", "TPEx", "US", "JP"):
+        if not any(q[1] == market for q in quotes.values()):
+            old = {c: q for c, q in (previous.get("quotes") or {}).items() if q[1] == market}
+            quotes.update(old)
+            if old and (previous.get("dates") or {}).get(market):
+                dates[market] = previous["dates"][market]
+            aliases.update({c: a for c, a in (previous.get("aliases") or {}).items() if c in old})
     export_json(path, {"updatedAt": now_tw().isoformat(timespec="seconds"), "dates": dates,
-                       "source": "臺灣證券交易所、證券櫃檯買賣中心", "quotes": quotes})
+                       "source": "臺灣證券交易所、證券櫃檯買賣中心；美股、日股代號來自維基百科 S&P 500 與日經 225 成分股",
+                       "quotes": quotes, "aliases": aliases})
 
 
 def export_json(path: Path, data: dict) -> None:
@@ -102,8 +122,14 @@ def run(days: int = HISTORY_DAYS, *, skip_foreign: bool = False, skip_news: bool
     stock_list = stocks.fetch_stock_list()
     if stock_list:
         db.upsert_stocks(conn, stock_list)
-        export_quotes(export_dir / "quotes.json", stock_list)
-        report["quotes"] = len(stock_list)
+    try:
+        global_list = global_quotes.fetch_all()
+    except Exception as error:  # 美日股失敗不影響台股與其他流程
+        global_list = []
+        report["errors"].append(f"美股、日股代號清單下載失敗：{error}")
+    if stock_list or global_list:
+        export_quotes(export_dir / "quotes.json", stock_list, global_list)
+        report["quotes"] = len(stock_list) + len(global_list)
     smap = db.stock_map(conn)
 
     foreign_result = None
