@@ -20,7 +20,7 @@ const yi = v => (v == null ? '—' : `${v > 0 ? '+' : ''}${(v / 1e8).toFixed(2)}
 function timeLabel(iso) {
   if (!iso) return '';
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 function safeUrl(url) {
   try {

@@ -100,6 +100,8 @@ button:disabled { cursor: not-allowed; }
 .badge-sentiment.down { background: var(--down); color: #fff; }
 .news-meta { margin: 4px 0 0; color: var(--ink-2); font-size: .8rem; overflow-wrap: anywhere; }
 
+#news-counts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
 /* 投資項目選單 */
 .plan-picker { display: grid; grid-template-columns: auto minmax(0, 360px) 1fr; align-items: center; gap: 8px 16px; padding-top: 20px; padding-bottom: 20px; }
 .plan-picker label { font-size: 1.1rem; font-weight: 700; }
