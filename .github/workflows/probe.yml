@@ -1,0 +1,28 @@
+name: probe close dates
+on:
+  push:
+    branches: ['claude/**']
+    paths: ['.github/workflows/probe.yml']
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          python3 - <<'PY'
+          import json, urllib.request
+          UA = 'Mozilla/5.0 (compatible; tw-market-intel/1.0)'
+          def get(url):
+              return json.loads(urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': UA}), timeout=30).read())
+          for d in ['115/11/13', '115/11/12', '115/10/01', '115/09/01']:
+              j = get(f'https://www.tpex.org.tw/web/stock/aftertrading/daily_close_quotes/stk_quote_result.php?l=zh-tw&d={d}')
+              rows = {r[0]: r[2] for r in j['tables'][0]['data']}
+              print('TPEx', d, 'resp date', j.get('date'), 'n', len(rows), {k: rows.get(k) for k in ('1815', '6147', '5347', '8069')})
+          for d in ['20261113', '20261112', '20261001', '20260901']:
+              j = get(f'https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date={d}&type=ALLBUT0999&response=json')
+              t = [t for t in j['tables'] if '每日收盤行情' in (t.get('title') or '')][0]
+              rows = {r[0]: r[8] for r in t['data']}
+              print('TWSE', d, 'resp date', j.get('date'), 'n', len(rows), {k: rows.get(k) for k in ('2330', '2317', '2885')})
+          for d in ['115/11/13', '115/10/01']:
+              j = get(f'https://www.tpex.org.tw/web/stock/3insti/qfii_trading/forgtr_result.php?l=zh-tw&t=D&type=buy&d={d}')
+              print('TPEx qfii', d, 'resp date', j['tables'][0].get('date'), j['tables'][0]['data'][:2])
+          PY
