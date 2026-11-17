@@ -24,8 +24,6 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    # 第一次執行需回補 60 個交易日的外資與收盤價（約 15 分鐘），之後由快取延續
-    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -33,13 +31,6 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: pip install -r requirements.txt
-      # 保留 SQLite（外資、收盤價歷史）供回測；快取遺失時會自動重新回補
-      - uses: actions/cache@v4
-        with:
-          path: data/market.db
-          # v2：舊快取含有日期錯誤的上櫃收盤價，改用新的快取鍵重新回補
-          key: market-db-v2-${{ github.run_id }}
-          restore-keys: market-db-v2-
       - run: python -m pytest -q analysis/tests
       - name: 抓取並分析
         env:
@@ -50,7 +41,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898333+github-actions[bot]@users.noreply.github.com"
-          git add data/foreign.json data/news.json data/recommend.json data/backtest.json data/recommend_history.json
+          git add data/foreign.json data/news.json data/recommend.json
           if git diff --cached --quiet; then
             echo "資料沒有變化"; exit 0
           fi

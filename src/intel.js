@@ -171,58 +171,6 @@ function renderWatchlist(data) {
   $('#watch-disclaimer').textContent = data.disclaimer || '';
 }
 
-// ---------- 回測 ----------
-const pct = v => (v == null ? '—' : `${v > 0 ? '+' : ''}${(v * 100).toFixed(2)}%`);
-function renderBacktestTable(id, result, horizons) {
-  const table = $(id);
-  const thead = el('thead');
-  const hr = el('tr');
-  ['持有', '買入 平均報酬', '買入 勝率', '買入 超額', '賣出 平均報酬', '賣出 下跌比例', '賣出 超額', '筆數'].forEach(h => hr.append(el('th', h)));
-  thead.append(hr);
-  const tbody = el('tbody');
-  const any = horizons.some(h => (result?.summary?.buy?.[h]?.n || 0) + (result?.summary?.sell?.[h]?.n || 0) > 0);
-  // 還沒有可計算的報酬時，改顯示說明文字（放在表格外，手機上才不會被裁切）
-  const wrap = table.closest('.table-wrap');
-  let msg = wrap.nextElementSibling?.classList.contains('backtest-msg') ? wrap.nextElementSibling : null;
-  if (!msg) {
-    msg = el('p', '', 'hint backtest-msg');
-    wrap.after(msg);
-  }
-  wrap.hidden = !any;
-  msg.hidden = any;
-  msg.textContent = result?.picks
-    ? `已保存 ${result.days} 天的名單（${result.first_date} 起），需等之後的交易日收盤價出來才能計算報酬，累積越多天越有參考價值。`
-    : '尚無資料。';
-  for (const h of any ? horizons : []) {
-    const b = result.summary.buy[h] || { n: 0 };
-    const s = result.summary.sell[h] || { n: 0 };
-    const tr = el('tr');
-    tr.append(el('td', `${h} 日`),
-      el('td', pct(b.avg_return), tone(b.avg_return || 0)), el('td', b.n ? pct(b.hit_rate).replace('+', '') : '—'),
-      el('td', pct(b.avg_excess), tone(b.avg_excess || 0)),
-      el('td', pct(s.avg_return), tone(s.avg_return || 0)), el('td', s.n ? pct(s.hit_rate).replace('+', '') : '—'),
-      el('td', pct(s.avg_excess), tone(s.avg_excess || 0)), el('td', `${b.n}／${s.n}`));
-    tbody.append(tr);
-  }
-  table.replaceChildren(thead, tbody);
-}
-
-async function loadBacktest() {
-  const status = $('#backtest-status');
-  try {
-    const bt = await loadJson('./data/backtest.json');
-    const horizons = (bt.horizons || [1, 5, 20]).map(String);
-    const fo = bt.foreign_only || {};
-    status.className = 'hint';
-    status.textContent = `收盤價資料 ${bt.price_days} 個交易日${bt.price_range ? `（${bt.price_range[0]}～${bt.price_range[1]}）` : ''}・外資策略回測 ${fo.days ?? 0} 天、${fo.picks ?? 0} 筆・更新於 ${timeLabel(bt.updatedAt)}`;
-    renderBacktestTable('#backtest-combined', bt.combined, horizons);
-    renderBacktestTable('#backtest-foreign', fo, horizons);
-  } catch (error) {
-    status.className = 'error';
-    status.textContent = `無法取得回測資料：${error.message}`;
-  }
-}
-
 async function loadIntel() {
   const foreignStatus = $('#foreign-status');
   const newsStatus = $('#news-status');
@@ -261,4 +209,3 @@ async function loadIntel() {
 document.querySelectorAll('[data-foreign]').forEach(b => b.addEventListener('click', () => { foreignView = b.dataset.foreign; renderForeign(); }));
 document.querySelectorAll('[data-news]').forEach(b => b.addEventListener('click', () => { newsFilter = b.dataset.news; renderNews(); }));
 loadIntel();
-loadBacktest();
