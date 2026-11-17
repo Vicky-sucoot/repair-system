@@ -127,6 +127,10 @@ button:disabled { cursor: not-allowed; }
 .method summary { min-height: 36px; padding: 6px 0; font-size: .9rem; }
 @media (max-width: 760px) { .watch-columns { grid-template-columns: 1fr; } }
 
+.backtest-table td, .backtest-table th { text-align: right; }
+.backtest-table td:first-child, .backtest-table th:first-child { text-align: left; }
+.backtest-table td.hint { text-align: left; white-space: normal; }
+
 /* 投資項目選單 */
 .plan-picker { display: grid; grid-template-columns: auto minmax(0, 360px) 1fr; align-items: center; gap: 8px 16px; padding-top: 20px; padding-bottom: 20px; }
 .plan-picker label { font-size: 1.1rem; font-weight: 700; }
