@@ -157,6 +157,10 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .watch-item { border-top: 1px solid var(--border); padding: 10px 0; }
 .watch-row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
 .watch-score { font-weight: 800; font-variant-numeric: tabular-nums; }
+.watch-actions { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.watch-add { font: inherit; font-size: .85rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--accent); background: var(--surface); color: var(--accent); cursor: pointer; white-space: nowrap; }
+.watch-add:hover:not(:disabled) { background: var(--accent); color: #fff; }
+.watch-add:disabled { border-color: var(--border); color: var(--ink-2); cursor: default; }
 .watch-score.up { color: var(--up); }
 .watch-score.down { color: var(--down); }
 .watch-reason { margin: 4px 0 0; font-size: .9rem; }

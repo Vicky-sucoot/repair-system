@@ -26,6 +26,8 @@
   }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(list)); } catch { /* 無痕模式等情況忽略 */ }
+    // 通知其他區塊（例如觀察名單的「加入自選」按鈕）清單已變更
+    document.dispatchEvent(new CustomEvent('mylist:change', { detail: { list: [...list] } }));
   }
   function el(tag, text = '', className = '') {
     const node = document.createElement(tag);
@@ -157,6 +159,20 @@
     $('#mylist-input').value = '';
     message('');
     fillOptions();
+  });
+
+  // 其他區塊（觀察名單）以事件加入台股：detail.code 為代號，結果寫回 detail.result
+  document.addEventListener('mylist:add', event => {
+    const { code, name } = event.detail || {};
+    if (typeof code !== 'string' || !code) return;
+    const shown = label(code) || name || code;
+    if (list.includes(code)) { event.detail.result = { ok: false, text: `${shown}（${code}）已在自選清單中。` }; return; }
+    if (list.length >= MAX) { event.detail.result = { ok: false, text: `自選清單最多 ${MAX} 檔。`, error: true }; return; }
+    list.push(code);
+    save();
+    message(`已從觀察名單加入 ${shown}（${code}）。`);
+    render();
+    event.detail.result = { ok: true, text: `已加入 ${shown}（${code}）到「行情」的自選清單。` };
   });
 
   $('#mylist-form').addEventListener('submit', event => {
