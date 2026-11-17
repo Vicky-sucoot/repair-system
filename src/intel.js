@@ -147,10 +147,47 @@ function renderNews() {
 }
 
 // ---------- 今日觀察名單 ----------
+// 「加入自選」：加入行情頁的自選清單（由 mylist.js 處理），已在清單中的顯示「已在自選」
+const MYLIST_KEY = 'dca-tracker-mylist';
+function myList() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(MYLIST_KEY));
+    return Array.isArray(saved) ? saved : [];
+  } catch { return []; }
+}
+function setAddState(button, added) {
+  button.disabled = added;
+  button.textContent = added ? '已在自選' : '＋自選';
+  button.setAttribute('aria-label', `${added ? '已在自選清單' : '加入自選清單'}：${button.dataset.name} ${button.dataset.code}`);
+}
+function addButton(c) {
+  const button = el('button', '', 'watch-add');
+  button.type = 'button';
+  button.dataset.code = c.code;
+  button.dataset.name = c.name;
+  setAddState(button, myList().includes(c.code));
+  button.addEventListener('click', () => {
+    const detail = { code: c.code, name: c.name };
+    document.dispatchEvent(new CustomEvent('mylist:add', { detail }));
+    const result = detail.result || { ok: false, text: '自選清單尚未載入，請稍後再試。', error: true };
+    const status = $('#watch-message');
+    status.className = result.error ? 'error' : 'hint';
+    status.textContent = result.text;
+    if (!result.error) setAddState(button, true);
+  });
+  return button;
+}
+document.addEventListener('mylist:change', event => {
+  const list = event.detail?.list || [];
+  document.querySelectorAll('.watch-add').forEach(b => setAddState(b, list.includes(b.dataset.code)));
+});
+
 function watchItem(c, side) {
   const li = el('li', '', 'watch-item');
   const head = el('div', '', 'watch-row');
-  head.append(el('strong', `${c.name} ${c.code}`), el('span', `${c.score > 0 ? '+' : ''}${c.score}`, `watch-score ${tone(c.score)}`));
+  const right = el('span', '', 'watch-actions');
+  right.append(el('span', `${c.score > 0 ? '+' : ''}${c.score}`, `watch-score ${tone(c.score)}`), addButton(c));
+  head.append(el('strong', `${c.name} ${c.code}`), right);
   const facts = [
     `外資 ${lots(c.net_lots)} 張${c.net_value != null ? `（${yi(c.net_value)} 億）` : ''}`,
     side === 'buy' ? (c.streak_days >= 2 ? `連買 ${c.streak_days} 天` : '') : (c.sell_streak_days >= 2 ? `連賣 ${c.sell_streak_days} 天` : ''),
