@@ -1,0 +1,29 @@
+name: probe data sources
+on:
+  push:
+    branches: ['claude/**']
+    paths: ['.github/workflows/probe.yml']
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: probe
+        run: |
+          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36'
+          get() { echo; echo "=== $1"; curl -sS -m 25 -A "$UA" -L "$1" -o out.bin -w "HTTP %{http_code} %{content_type} %{size_download}B\n"; head -c ${2:-900} out.bin | iconv -f utf-8 -t utf-8 -c; echo; }
+          get "https://www.twse.com.tw/rwd/zh/fund/TWT38U?date=20261116&response=json" 1500
+          get "https://www.twse.com.tw/rwd/zh/fund/T86?date=20261116&selectType=ALLBUT0999&response=json" 1200
+          get "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL" 300
+          get "https://www.tpex.org.tw/www/zh-tw/insti/qfiiTrading?type=buy&date=2026/11/16&response=json" 1500
+          get "https://www.tpex.org.tw/www/zh-tw/insti/qfii?type=Daily&date=2026/11/16&response=json" 800
+          get "https://www.tpex.org.tw/web/stock/3insti/qfii_trading/forgtr_result.php?l=zh-tw&t=D&type=buy&d=115/11/16&_=1" 1200
+          get "https://www.tpex.org.tw/openapi/v1/tpex_3insti_daily_trading" 800
+          echo "=== tpex openapi paths"; curl -sS -m 25 -A "$UA" https://www.tpex.org.tw/openapi/swagger.json | python3 -c "import sys,json;d=json.load(sys.stdin);[print(p, (v.get('get') or {}).get('summary','')) for p,v in d['paths'].items() if any(k in p.lower() for k in ['insti','qfii','fund','foreign','daily_close','mainboard_quotes'])]" || true
+          echo "=== twse openapi paths"; curl -sS -m 25 -A "$UA" https://openapi.twse.com.tw/v1/swagger.json | python3 -c "import sys,json;d=json.load(sys.stdin);[print(p, (v.get('get') or {}).get('summary','')) for p,v in d['paths'].items() if 'fund' in p.lower() or 'TWT38' in p or 'T86' in p]" || true
+          get "https://api.cnyes.com/media/api/v1/newslist/category/tw_stock?limit=3" 1500
+          get "https://money.udn.com/rssfeed/news/1001/5590?ch=money" 1500
+          get "https://money.udn.com/rssfeed/news/1001/5607?ch=money" 600
+          get "https://www.ctee.com.tw/rss_web/livenews/stock" 1200
+          get "https://www.ctee.com.tw/feed" 600
+          get "https://www.ctee.com.tw/rss_web/livenews/ctee" 600
+          for h in news.cnyes.com api.cnyes.com money.udn.com www.ctee.com.tw; do echo "=== robots $h"; curl -sS -m 20 -A "$UA" "https://$h/robots.txt" | head -25; done
