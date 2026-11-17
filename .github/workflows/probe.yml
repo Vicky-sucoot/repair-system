@@ -8,12 +8,11 @@ jobs:
     steps:
       - run: |
           UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36'
-          for u in https://api.nasdaq.com/robots.txt https://www.nasdaq.com/robots.txt https://quote.cnbc.com/robots.txt https://rate.bot.com.tw/robots.txt https://www.cnbc.com/robots.txt; do
-            echo "=== $u"; curl -sS -m 20 -A "$UA" -w '\nHTTP %{http_code}\n' "$u" | head -60; done
-          for u in "https://api.nasdaq.com/api/quote/SOX/historical?assetclass=index&fromdate=2026-10-01&todate=2026-11-18&limit=5" \
-                   "https://api.nasdaq.com/api/quote/SOX/info?assetclass=index" \
-                   "https://api.nasdaq.com/api/quote/GC%3ACMX/historical?assetclass=commodities&fromdate=2026-10-01&todate=2026-11-18&limit=5" \
-                   "https://api.nasdaq.com/api/quote/GC%3ACMX/info?assetclass=commodities" \
-                   "https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=.SOX%7C%40GC.1&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json" \
-                   "https://rate.bot.com.tw/gold/csv/2026-11/TWD/0" ; do
-            echo "=== $u"; curl -sS -m 20 -A "$UA" -H 'Accept: application/json' -w '\nHTTP %{http_code}\n' "$u" | head -c 1500; echo; done
+          for u in https://ws.api.cnyes.com/robots.txt https://api.cnyes.com/robots.txt https://www.cnyes.com/robots.txt https://www.marketwatch.com/robots.txt https://www.google.com/robots.txt; do
+            echo "=== $u"; curl -sS -m 20 -A "$UA" -w '\nHTTP %{http_code}\n' "$u" | grep -iv "sitemap" | head -40; done
+          T=$(date +%s); F=$((T-86400*20))
+          for s in GI:SOX:INDEX GI:XAU:INDEX FX:XAUUSD:FOREX CM:GC:COMMODITY FT:GC:FUTURES; do
+            for u in "https://ws.api.cnyes.com/ws/api/v1/charting/history?symbol=$s&resolution=D&quote=1&from=$T&to=$F" "https://ws.api.cnyes.com/ws/api/v1/quote/quotes/$s"; do
+              echo "=== $u"; curl -sS -m 20 -A "$UA" -w '\nHTTP %{http_code}\n' "$u" | head -c 900; echo; done; done
+          for c in SOF TGF GDF; do
+            echo "=== taifex $c"; curl -sS -m 30 -A "$UA" -X POST -d "down_type=1&commodity_id=$c&queryStartDate=2026/11/10&queryEndDate=2026/11/17" https://www.taifex.com.tw/cht/3/futDataDown | iconv -f big5 -t utf-8 -c | head -8; done
