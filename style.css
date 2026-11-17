@@ -100,6 +100,11 @@ button:disabled { cursor: not-allowed; }
 .badge-sentiment.down { background: var(--down); color: #fff; }
 .news-meta { margin: 4px 0 0; color: var(--ink-2); font-size: .8rem; overflow-wrap: anywhere; }
 
+.insight { border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 12px; padding: 12px 16px; margin: 12px 0; background: var(--surface-2); }
+.insight-head { margin: 0; }
+.insight .chip { background: var(--surface); border: 1px solid var(--border); }
+.insight-summary { margin: 6px 0; }
+.insight-list { margin: 6px 0; padding-left: 0; list-style: none; display: grid; gap: 6px; font-size: .9rem; }
 #news-counts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 /* 投資項目選單 */
