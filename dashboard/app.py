@@ -14,9 +14,10 @@ import pandas as pd
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from analysis import db, pipeline  # noqa: E402
+from analysis import db, pipeline, recommend  # noqa: E402
 from analysis.config import DB_PATH, EXPORT_DIR, STREAK_MIN_DAYS  # noqa: E402
-from analysis.foreign_analysis import analyze  # noqa: E402
+from analysis.foreign_analysis import analyze, stock_flows  # noqa: E402
+from analysis.crawlers.news import dedupe_ticks  # noqa: E402
 
 st.set_page_config(page_title="外資動向與新聞情緒", page_icon="📈", layout="wide")
 st.title("台股外資動向與新聞情緒")
@@ -62,7 +63,48 @@ with st.sidebar:
             st.warning(error)
     st.caption("資料：臺灣證券交易所、證券櫃檯買賣中心、鉅亨網、經濟日報、工商時報。僅供參考，不構成投資建議。")
 
-foreign_tab, news_tab = st.tabs(["外資動向", "新聞情緒"])
+@st.cache_data(ttl=600)
+def load_recommend(big_value: float) -> dict:
+    """優先讀取每日流程匯出的觀察名單（含 Claude 理由）；本機資料較新時改用 SQLite 即時計算。"""
+    path = EXPORT_DIR / "recommend.json"
+    saved = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    if DB_PATH.exists():
+        conn = db.connect(DB_PATH)
+        dates = db.foreign_dates(conn)[-30:]
+        if dates and dates[-1] > (saved.get("date") or ""):
+            rows = db.foreign_rows(conn, since=dates[0])
+            prices = {c: s["close"] for c, s in db.stock_map(conn).items()}
+            items = dedupe_ticks(db.news_items(conn, analyzed=True))
+            conn.close()
+            _, flows = stock_flows(rows, prices)
+            return {"date": dates[-1], **recommend.build(flows, items, pipeline.now_tw().date(), big_value=big_value)}
+        conn.close()
+    return saved
+
+
+watch_tab, foreign_tab, news_tab = st.tabs(["今日觀察名單", "外資動向", "新聞情緒"])
+
+with watch_tab:
+    rec = load_recommend(big_value_e * 1e8)
+    if not rec.get("date"):
+        st.info("尚無觀察名單，請按左側「立即重新抓取並分析」。")
+    else:
+        st.subheader(f"{rec['date']} 今日觀察名單")
+        st.caption(rec.get("disclaimer", ""))
+        left, right = st.columns(2)
+        for col, key, title in ((left, "buy", "建議買入（外資買超＋新聞利多）"), (right, "sell", "建議賣出／避開（外資賣超＋新聞利空）")):
+            col.markdown(f"#### {title}")
+            rows = rec.get(key) or []
+            if not rows:
+                col.info("今日沒有符合條件的個股。")
+            for c in rows:
+                with col.container(border=True):
+                    st.markdown(f"**{c['name']}（{c['code']}）** 綜合分數 **{c['score']:+d}**")
+                    st.caption(f"外資分 {c['foreign_score']}・新聞分 {c['news_score']}・外資 {c['net_lots']:+,} 張・"
+                               f"利多 {c['bullish']}／利空 {c['bearish']} 則")
+                    st.write(c["reason"])
+        with st.expander("評分方式"):
+            st.markdown(recommend.__doc__)
 
 
 def stock_table(rows: list[dict]) -> pd.DataFrame:
@@ -105,12 +147,12 @@ with foreign_tab:
         else:
             st.caption("設定 ANTHROPIC_API_KEY 後，每日流程會產生 Claude 解讀。")
         st.markdown("#### 連續買超")
-        st.dataframe(stock_table(data["streaks"]), hide_index=True, use_container_width=True)
+        st.dataframe(stock_table(data["streaks"]), hide_index=True, width="stretch")
         left, right = st.columns(2)
         left.markdown("#### 單日大買（依金額）")
-        left.dataframe(stock_table(data["big_buys"]), hide_index=True, use_container_width=True)
+        left.dataframe(stock_table(data["big_buys"]), hide_index=True, width="stretch")
         right.markdown("#### 單日大賣（依金額）")
-        right.dataframe(stock_table(data["big_sells"]), hide_index=True, use_container_width=True)
+        right.dataframe(stock_table(data["big_sells"]), hide_index=True, width="stretch")
 
 with news_tab:
     data = load_news()
@@ -128,7 +170,7 @@ with news_tab:
         if not stocks_df.empty:
             st.dataframe(stocks_df.rename(columns={"code": "代號", "name": "名稱", "bullish": "利多", "bearish": "利空",
                                                    "neutral": "中性", "total": "則數"})[["代號", "名稱", "利多", "利空", "中性", "則數"]],
-                         hide_index=True, use_container_width=True)
+                         hide_index=True, width="stretch")
         st.markdown("#### 新聞")
         for item in items:
             if choice != "全部" and item["sentiment"] != choice:

@@ -107,6 +107,26 @@ button:disabled { cursor: not-allowed; }
 .insight-list { margin: 6px 0; padding-left: 0; list-style: none; display: grid; gap: 6px; font-size: .9rem; }
 #news-counts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
+/* 頁面導覽與今日觀察名單 */
+.section-nav { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; overflow-x: auto; margin: -8px 0 20px; padding: 8px 0; background: var(--bg); }
+.section-nav a { flex: none; padding: 6px 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--accent); font-weight: 600; text-decoration: none; font-size: .9rem; }
+.watch-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.watch-head { margin: 8px 0; font-size: 1.05rem; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.watch-head.up { color: var(--up); }
+.watch-head.down { color: var(--down); }
+.watch-head .hint { font-weight: 400; font-size: .8rem; }
+.watch-list { list-style: none; margin: 0; padding: 0; }
+.watch-item { border-top: 1px solid var(--border); padding: 10px 0; }
+.watch-row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.watch-score { font-weight: 800; font-variant-numeric: tabular-nums; }
+.watch-score.up { color: var(--up); }
+.watch-score.down { color: var(--down); }
+.watch-reason { margin: 4px 0 0; font-size: .9rem; }
+.watch-link { display: block; color: var(--accent); }
+.disclaimer { margin-top: 12px; }
+.method summary { min-height: 36px; padding: 6px 0; font-size: .9rem; }
+@media (max-width: 760px) { .watch-columns { grid-template-columns: 1fr; } }
+
 /* 投資項目選單 */
 .plan-picker { display: grid; grid-template-columns: auto minmax(0, 360px) 1fr; align-items: center; gap: 8px 16px; padding-top: 20px; padding-bottom: 20px; }
 .plan-picker label { font-size: 1.1rem; font-weight: 700; }
@@ -175,3 +195,4 @@ footer { text-align: center; margin-top: 28px; color: var(--ink); }
   .tile { padding: 10px 12px; }
   .tile-value { font-size: clamp(.9rem, 4.4vw, 1.1rem); }
 }
+h2[id] { scroll-margin-top: 64px; }

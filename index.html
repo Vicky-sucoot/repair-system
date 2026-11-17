@@ -23,6 +23,33 @@
       <h1>定期定額</h1>
       <p>設定原始投入後，每月手動輸入當月投入金額並送出，依網路股價自動累積計算庫存、市值與獲利（新台幣）。</p>
     </header>
+    <nav class="section-nav" aria-label="頁面導覽">
+      <a href="#watch-title">觀察名單</a>
+      <a href="#market-title">行情</a>
+      <a href="#foreign-title">外資動向</a>
+      <a href="#news-title">新聞情緒</a>
+      <a href="#summary-title">定期定額</a>
+    </nav>
+
+    <section class="panel intel watchlist" aria-labelledby="watch-title">
+      <div class="section-heading">
+        <div><h2 id="watch-title">今日觀察名單</h2><p id="watch-status" class="hint" role="status">讀取中…</p></div>
+      </div>
+      <div class="watch-columns">
+        <div>
+          <h3 class="watch-head up">建議買入<span class="hint">外資買超＋新聞利多</span></h3>
+          <ol id="watch-buy" class="watch-list"></ol>
+        </div>
+        <div>
+          <h3 class="watch-head down">建議賣出／避開<span class="hint">外資賣超＋新聞利空</span></h3>
+          <ol id="watch-sell" class="watch-list"></ol>
+        </div>
+      </div>
+      <details class="method"><summary>評分方式</summary>
+        <p class="hint">綜合分數（-100～+100）＝ 55% 外資分數 ＋ 45% 新聞分數。外資分數看今日買賣超金額（20 億元為滿分、開根號計算，5 億元約一半）與連續買／賣超天數（5 天為滿分）；新聞分數為近 3 天提及該股新聞的利多／利空平均，越新的新聞權重越高，只有一則新聞時打折。只列出外資與新聞方向一致的個股；方向相反（例如外資賣、新聞利多）視為訊號分歧，不列入。</p>
+      </details>
+      <p id="watch-disclaimer" class="hint disclaimer"></p>
+    </section>
 
     <section class="panel market" aria-labelledby="market-title">
       <div class="section-heading">
@@ -89,6 +116,7 @@
         <li>台股預設整股（零股）買進，未用完的金額不扣款；手續費＝成交金額 × 費率，不足最低手續費以最低計。</li>
         <li>VOO 以投入當日美元匯率換算新台幣，預設可買碎股、股息預扣 30% 稅；市值以最新匯率換算。</li>
         <li>配息依除息日持股計算；勾選「股息再投入」會於除息日買進，否則列為已領現金，並計入總報酬。</li>
+        <li>今日觀察名單由外資買賣超與新聞情緒自動評分產生，每個交易日更新（台灣時間 08:17、17:47），僅供研究參考，不構成投資建議。</li>
         <li>外資動向來自臺灣證券交易所與證券櫃檯買賣中心「外資及陸資買賣超彙總表」，金額以最新收盤價估算；財經新聞來自鉅亨網、經濟日報、工商時報，只顯示標題與摘要。新聞情緒與外資解讀由 Claude AI 分析（未設定金鑰時改用關鍵字詞典），可能有誤，僅供參考，不構成投資建議。</li>
         <li>股價、配息與加權指數來自 Yahoo Finance，台指期夜盤（近月、盤後交易時段）來自臺灣期貨交易所；每個交易日由 GitHub Actions 自動更新兩次（台灣時間 07:17 與 14:17），點選行情卡片可開啟來源網站看即時報價。試算結果僅供參考，不構成投資建議，實際成交以券商對帳單為準。</li>
       </ul>

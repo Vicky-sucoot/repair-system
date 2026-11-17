@@ -139,6 +139,38 @@ function renderNews() {
   if (!items.length) list.replaceChildren(el('li', '沒有符合的新聞。', 'hint'));
 }
 
+// ---------- 今日觀察名單 ----------
+function watchItem(c, side) {
+  const li = el('li', '', 'watch-item');
+  const head = el('div', '', 'watch-row');
+  head.append(el('strong', `${c.name} ${c.code}`), el('span', `${c.score > 0 ? '+' : ''}${c.score}`, `watch-score ${tone(c.score)}`));
+  const facts = [
+    `外資 ${lots(c.net_lots)} 張${c.net_value != null ? `（${yi(c.net_value)} 億）` : ''}`,
+    side === 'buy' ? (c.streak_days >= 2 ? `連買 ${c.streak_days} 天` : '') : (c.sell_streak_days >= 2 ? `連賣 ${c.sell_streak_days} 天` : ''),
+    `新聞 利多 ${c.bullish}／利空 ${c.bearish}`,
+    `外資分 ${c.foreign_score}・新聞分 ${c.news_score}`,
+  ].filter(Boolean);
+  li.append(head, el('p', facts.join('・'), 'news-meta'), el('p', c.reason, 'watch-reason'));
+  const link = (c.headlines || []).map(h => ({ ...h, url: safeUrl(h.url) })).find(h => h.url);
+  if (link) {
+    const a = el('a', `相關新聞：${link.title}`, 'news-meta watch-link');
+    a.href = link.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    li.append(a);
+  }
+  if (String(c.reason_by || '').startsWith('claude')) li.append(el('span', '理由由 Claude 撰寫', 'flag'));
+  return li;
+}
+
+function renderWatchlist(data) {
+  const fill = (id, rows, side) => {
+    $(id).replaceChildren(...(rows?.length ? rows.map(c => watchItem(c, side))
+      : [el('li', side === 'buy' ? '今日沒有外資買超且新聞偏多的個股。' : '今日沒有外資賣超且新聞偏空的個股。', 'hint')]));
+  };
+  fill('#watch-buy', data.buy, 'buy');
+  fill('#watch-sell', data.sell, 'sell');
+  $('#watch-disclaimer').textContent = data.disclaimer || '';
+}
+
 async function loadIntel() {
   const foreignStatus = $('#foreign-status');
   const newsStatus = $('#news-status');
@@ -150,6 +182,16 @@ async function loadIntel() {
   } catch (error) {
     foreignStatus.className = 'error';
     foreignStatus.textContent = `無法取得外資資料：${error.message}`;
+  }
+  const watchStatus = $('#watch-status');
+  try {
+    const watch = await loadJson('./data/recommend.json');
+    watchStatus.className = 'hint';
+    watchStatus.textContent = `外資資料 ${watch.date}・更新於 ${timeLabel(watch.updatedAt)}・同時有外資與新聞訊號的個股 ${watch.candidates} 檔`;
+    renderWatchlist(watch);
+  } catch (error) {
+    watchStatus.className = 'error';
+    watchStatus.textContent = `無法取得觀察名單：${error.message}`;
   }
   try {
     newsData = await loadJson('./data/news.json');
