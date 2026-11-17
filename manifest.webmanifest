@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "定期定額",
-  "short_name": "定期定額",
+  "name": "錢進梁家",
+  "short_name": "錢進梁家",
   "description": "定期不定額：每月手動輸入投入金額，依網路股價自動累積計算庫存與獲利。",
   "lang": "zh-Hant",
   "start_url": "./index.html",

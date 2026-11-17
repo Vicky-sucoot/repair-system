@@ -18,7 +18,7 @@
     const label = tabs.find(t => t.dataset.page === id)?.textContent.trim();
     const heading = document.querySelector('header h1');
     if (label && heading) heading.textContent = label;
-    if (label) document.title = label === '定期定額' ? '定期定額' : `${label}｜定期定額`;
+    if (label) document.title = label === '定期定額' ? '錢進梁家' : `${label}｜錢進梁家`;
     if (save) {
       try { localStorage.setItem(KEY, id); } catch { /* 無痕模式等情況忽略 */ }
       history.replaceState(null, '', `#${id}`);
