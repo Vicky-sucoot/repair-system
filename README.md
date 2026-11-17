@@ -34,9 +34,17 @@
 
 「最新行情」顯示**加權指數**、**台指期夜盤**（近月、盤後交易時段）、0050、VOO 與美元匯率，點選卡片會在新視窗開啟來源網站（Yahoo 股市、期交所）查看即時報價。
 
-瀏覽器無法直接跨網域讀取 Yahoo Finance 與期交所，因此由 GitHub Actions 工作流程 [`update-prices.yml`](.github/workflows/update-prices.yml) 執行 `scripts/fetch-prices.mjs`：
+瀏覽器無法直接跨網域讀取這些資料，因此由 GitHub Actions 工作流程 [`update-prices.yml`](.github/workflows/update-prices.yml) 執行 `scripts/fetch-prices.mjs`，寫入 `data/prices.json` 並提交回 `main`：
 
-- 下載 0050.TW、VOO 的日收盤價與配息、美元兌新台幣匯率（`TWD=X`）、加權指數（`^TWII`），以及期交所台指期（TX）夜盤行情，寫入 `data/prices.json` 並提交回 `main`。
+| 資料 | 來源 | 說明 |
+|---|---|---|
+| 0050 收盤價與配息 | 臺灣證券交易所（`STOCK_DAY`、`TWT49U`） | robots.txt 允許程式讀取。證交所提供原始價格，程式會偵測分割（例如 2025-06-18 一拆四），把分割前的價格與配息還原成與現價可比較 |
+| 加權指數 | 臺灣證券交易所（`MI_5MINS_HIST`） | 同上 |
+| 美元兌新台幣 | 臺灣期貨交易所每日外幣參考匯率（`dailyFXRateDown`） | 期交所沒有 robots.txt 限制 |
+| 台指期夜盤 | 臺灣期貨交易所（`futDataDown`） | 同上 |
+| VOO | Yahoo Finance | 依使用者選擇沿用。Yahoo 的 robots.txt 不允許程式抓取，日後可能被封鎖；失敗時沿用上一版資料 |
+
+- 證交所、期交所的歷史資料第一次需要逐月回補（0050 自 2009 年起，約 15 分鐘），之後每次只抓最近一個月並與既有資料合併。
 - 觸發時機：台灣時間週二至週六 07:17（美股收盤、夜盤 05:00 收盤後）與週一至週五 14:17（台股收盤後）、修改 `src/`／抓取腳本並推送到 `main` 時，或在 Actions 頁面手動執行「更新股價資料」。
 - 單一標的下載失敗時沿用上一版資料；全部失敗則不更新。
 - 網站顯示資料更新時間，超過 4 天未更新會提示資料可能已過期。
