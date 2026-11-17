@@ -37,8 +37,9 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: data/market.db
-          key: market-db-${{ github.run_id }}
-          restore-keys: market-db-
+          # v2：舊快取含有日期錯誤的上櫃收盤價，改用新的快取鍵重新回補
+          key: market-db-v2-${{ github.run_id }}
+          restore-keys: market-db-v2-
       - run: python -m pytest -q analysis/tests
       - name: 抓取並分析
         env:
