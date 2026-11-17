@@ -483,11 +483,11 @@ function render() {
 
 // 最新行情卡片：每張可點開來源網站查看最新報價。
 const QUOTE_LINKS = {
-  '0050.TW': 'https://tw.stock.yahoo.com/quote/0050.TW',
-  'VOO': 'https://finance.yahoo.com/quote/VOO/',
-  [FX_SYMBOL]: 'https://finance.yahoo.com/quote/TWD%3DX/',
-  TWII: 'https://tw.stock.yahoo.com/quote/%5ETWII',
-  TX_NIGHT: 'https://www.taifex.com.tw/cht/3/futDailyMarketReport'
+  [FX_SYMBOL]: 'https://www.taifex.com.tw/cht/3/dailyFXRate',
+  TWII: 'https://www.twse.com.tw/zh/indices/taiex/mi-5min-hist.html',
+  TX_NIGHT: 'https://www.taifex.com.tw/cht/3/futDailyMarketReport',
+  SOX: 'https://invest.cnyes.com/index/GI/SOX',
+  GOLD: 'https://www.taifex.com.tw/cht/3/futDailyMarketReport'
 };
 const indexNumber = n => n.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 function quoteCard({ key, short, name, value, change, detail, date }) {
@@ -506,29 +506,36 @@ function renderQuotes() {
   const list = $('#quotes');
   const cards = [];
   // 指數放最前面。
-  const twii = prices.indices?.TWII;
-  if (twii?.close?.length) {
-    const n = twii.close.length;
-    const change = n > 1 ? twii.close[n - 1] / twii.close[n - 2] - 1 : 0;
-    const diff = n > 1 ? twii.close[n - 1] - twii.close[n - 2] : 0;
-    cards.push(quoteCard({ key: 'TWII', short: '加權指數', name: '台灣證券交易所', value: indexNumber(twii.close[n - 1]), change,
-      detail: `${diff >= 0 ? '+' : ''}${indexNumber(diff)}（${format.percent(change)}）`, date: twii.dates[n - 1] }));
-  }
+  const indexCard = (key, short, name) => {
+    const s = prices.indices?.[key];
+    if (!s?.close?.length) return;
+    const n = s.close.length;
+    const change = n > 1 ? s.close[n - 1] / s.close[n - 2] - 1 : 0;
+    const diff = n > 1 ? s.close[n - 1] - s.close[n - 2] : 0;
+    cards.push(quoteCard({ key, short, name, value: indexNumber(s.close[n - 1]), change,
+      detail: `${diff >= 0 ? '+' : ''}${indexNumber(diff)}（${format.percent(change)}）`, date: s.dates[n - 1] }));
+  };
+  indexCard('TWII', '加權指數', '台灣證券交易所');
   const night = prices.indices?.TX_NIGHT?.series?.at(-1);
   if (night) {
     const pct = night.changePct == null ? null : night.changePct / 100;
     cards.push(quoteCard({ key: 'TX_NIGHT', short: '台指期夜盤', name: `近月 ${night.month.slice(0, 4)}/${night.month.slice(4)}`, value: twd.format(night.close), change: night.change ?? 0,
       detail: `${night.change > 0 ? '+' : ''}${night.change ?? '—'}（${format.percent(pct)}）`, date: `${night.date} 夜盤收盤` }));
   }
-  const entries = [...Object.entries(ASSETS).map(([s, a]) => [s, a.short, a.name, a.currency]), [FX_SYMBOL, 'USD/TWD', '美元兌新台幣', 'FX']];
-  for (const [symbol, short, name, currency] of entries) {
-    const s = prices.symbols[symbol];
-    if (!s) continue;
-    const n = s.close.length;
-    const change = n > 1 ? s.close[n - 1] / s.close[n - 2] - 1 : 0;
-    cards.push(quoteCard({ key: symbol, short, name, change,
-      value: currency === 'FX' ? s.close[n - 1].toFixed(3) : format.price(s.close[n - 1], currency),
-      detail: format.percent(change), date: s.dates[n - 1] }));
+  indexCard('SOX', '費城半導體', '美國・指數');
+  const gold = prices.indices?.GOLD?.series?.at(-1);
+  if (gold) {
+    const pct = gold.changePct == null ? null : gold.changePct / 100;
+    cards.push(quoteCard({ key: 'GOLD', short: '黃金', name: '美元／盎司', value: `US$${indexNumber(gold.close)}`, change: gold.change ?? 0,
+      detail: gold.change == null ? '—' : `${gold.change >= 0 ? '+' : ''}${indexNumber(gold.change)}（${format.percent(pct)}）`,
+      date: `${gold.date} 結算價` }));
+  }
+  const fx = prices.symbols[FX_SYMBOL];
+  if (fx?.close?.length) {
+    const n = fx.close.length;
+    const change = n > 1 ? fx.close[n - 1] / fx.close[n - 2] - 1 : 0;
+    cards.push(quoteCard({ key: FX_SYMBOL, short: 'USD/TWD', name: '美元兌新台幣', change,
+      value: fx.close[n - 1].toFixed(3), detail: format.percent(change), date: fx.dates[n - 1] }));
   }
   list.replaceChildren(...cards);
 }

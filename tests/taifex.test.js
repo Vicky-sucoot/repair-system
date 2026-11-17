@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTaifexCsv, nightSessionSeries, futDataDownBody } from '../src/taifex.js';
+import { parseTaifexCsv, nightSessionSeries, settlementSeries, futDataDownBody } from '../src/taifex.js';
 
 // 取自期交所 futDataDown 實際回應（已轉為 UTF-8）。
 const CSV = `交易日期,契約,到期月份(週別),開盤價,最高價,最低價,收盤價,漲跌價,漲跌%,成交量,結算價,未沖銷契約數,最後最佳買價,最後最佳賣價,歷史最高價,歷史最低價,是否因訊息面暫停交易,交易時段,價差對單式委託成交量
@@ -16,7 +16,7 @@ const CSV = `交易日期,契約,到期月份(週別),開盤價,最高價,最低
 test('解析期交所 CSV', () => {
   const rows = parseTaifexCsv(CSV);
   assert.equal(rows.length, 7);
-  assert.deepEqual(rows[1], { date: '2026-11-13', contract: 'TX', month: '202611', open: 43180, high: 44034, low: 42371, close: 43676, change: 548, changePct: 1.27, volume: 79972, session: '盤後' });
+  assert.deepEqual(rows[1], { date: '2026-11-13', contract: 'TX', month: '202611', open: 43180, high: 44034, low: 42371, close: 43676, change: 548, changePct: 1.27, volume: 79972, session: '盤後', settle: null });
   assert.throws(() => parseTaifexCsv('<html>error</html>'), /不是行情 CSV/);
 });
 
@@ -47,4 +47,25 @@ test('解析期交所每日外幣參考匯率', async () => {
   assert.deepEqual(parseFxCsv(csv), [['2010-09-01', 32.027], ['2026-11-17', 32.85]]);
   assert.throws(() => parseFxCsv('<html>'), /不是匯率 CSV/);
   assert.equal(new URLSearchParams(fxDataDownBody('2026-11-01', '2026-11-30')).get('queryStartDate'), '2026/11/01');
+});
+
+// 期交所 GDF（美元黃金期貨）實際回應節錄：近月 202612、次月 202702。
+const GDF = `交易日期,契約,到期月份(週別),開盤價,最高價,最低價,收盤價,漲跌價,漲跌%,成交量,結算價,未沖銷契約數,最後最佳買價,最後最佳賣價,歷史最高價,歷史最低價,是否因訊息面暫停交易,交易時段,價差對單式委託成交量
+2026/11/10,GDF,202612  ,4158.2,4158.2,4138.8,4148.2,35.2,0.86%,4,4148.2,271,-,4184,4607.8,3910,,一般,,
+2026/11/10,GDF,202612  ,4171.3,4171.3,4171.3,4171.3,58.3,1.42%,1,-,-,-,4184,4607.8,3910,,盤後,,
+2026/11/10,GDF,202702  ,-,-,-,-,-,-,0,4191.3,28,-,4224,4154.5,3953.3,,一般,,
+2026/11/11,GDF,202702  ,-,-,-,-,-,-,0,4180.1,28,-,4224,4154.5,3953.3,,一般,,
+2026/11/11,GDF,202612  ,-,-,-,-,-,-,0,4100.0,271,-,4184,4607.8,3910,,一般,,
+2026/11/12,GDF,202702  ,-,-,-,-,-,-,0,4200,28,-,4224,4154.5,3953.3,,一般,,
+`;
+
+test('黃金期貨取一般盤近月結算價，漲跌比較同一月份', () => {
+  const series = settlementSeries(parseTaifexCsv(GDF), 'GDF');
+  assert.deepEqual(series, [
+    { date: '2026-11-10', month: '202612', close: 4148.2, change: null, changePct: null },
+    { date: '2026-11-11', month: '202612', close: 4100, change: -48.2, changePct: -1.16 },
+    // 近月到期後換到次月，漲跌改與次月前一日結算價比較
+    { date: '2026-11-12', month: '202702', close: 4200, change: 19.9, changePct: 0.48 }
+  ]);
+  assert.deepEqual(settlementSeries(parseTaifexCsv(CSV), 'GDF'), []);
 });

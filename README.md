@@ -34,7 +34,7 @@
 
 ## 股價資料
 
-「最新行情」顯示**加權指數**、**台指期夜盤**（近月、盤後交易時段）、0050、VOO 與美元匯率，點選卡片會在新視窗開啟來源網站（Yahoo 股市、期交所）查看即時報價。
+「最新行情」顯示**加權指數**、**台指期夜盤**（近月、盤後交易時段）、**費城半導體指數**、**黃金**（期交所美元黃金期貨近月結算價，美元／盎司）與美元匯率，點選卡片會在新視窗開啟來源網站（證交所、期交所、鉅亨網）。
 
 瀏覽器無法直接跨網域讀取這些資料，因此由 GitHub Actions 工作流程 [`update-prices.yml`](.github/workflows/update-prices.yml) 執行 `scripts/fetch-prices.mjs`，寫入 `data/prices.json` 並提交回 `main`：
 
@@ -44,6 +44,8 @@
 | 加權指數 | 臺灣證券交易所（`MI_5MINS_HIST`） | 同上 |
 | 美元兌新台幣 | 臺灣期貨交易所每日外幣參考匯率（`dailyFXRateDown`） | 期交所沒有 robots.txt 限制 |
 | 台指期夜盤 | 臺灣期貨交易所（`futDataDown`） | 同上 |
+| 黃金 | 臺灣期貨交易所美元黃金期貨（`futDataDown`，契約 `GDF`） | 取一般交易時段近月契約結算價（美元／盎司）；成交稀少時收盤價可能停在舊價，結算價每天都有 |
+| 費城半導體指數 | 鉅亨網行情 API（`ws.api.cnyes.com`，`GI:SOX:INDEX`） | 該網域沒有 robots.txt 限制（`invest.cnyes.com` 的 robots.txt 也允許全部） |
 | VOO | Yahoo Finance | 依使用者選擇沿用。Yahoo 的 robots.txt 不允許程式抓取，日後可能被封鎖；失敗時沿用上一版資料 |
 
 - 證交所、期交所的歷史資料第一次需要逐月回補（0050 自 2009 年起，約 15 分鐘），之後每次只抓最近一個月並與既有資料合併。
@@ -97,7 +99,8 @@ API：`GET /api/recommendations`（今日觀察名單，可帶 `top_n`、`big_va
 - `index.html`、`style.css`：頁面與樣式
 - `src/dca.js`：定期不定額試算核心（純函式，瀏覽器與測試共用）
 - `src/yahoo.js`：解析 Yahoo Finance chart API
-- `src/taifex.js`：解析期交所期貨每日行情 CSV（台指期夜盤）
+- `src/taifex.js`：解析期交所期貨每日行情 CSV（台指期夜盤、黃金期貨結算價、匯率）
+- `src/cnyes.js`：解析鉅亨網行情走勢 API（費城半導體指數）
 - `src/intel.js`：網站的外資動向、新聞情緒區塊
 - `src/tabs.js`：底部選項列與單頁切換
 - `src/mylist.js`：行情頁的自選清單（台股、美股、日股）
