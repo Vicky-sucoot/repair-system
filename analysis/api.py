@@ -10,6 +10,7 @@ from typing import Literal
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 
 from . import db, pipeline
+from .crawlers.news import dedupe_ticks
 from .config import BIG_TRADE_VALUE, DB_PATH, NEWS_KEEP_DAYS, STREAK_MIN_DAYS, TOP_N
 from .foreign_analysis import analyze
 
@@ -59,7 +60,8 @@ def news_list(sentiment: Literal["利多", "利空", "中性"] | None = None, st
     """近期新聞與情緒，可依情緒或個股代號篩選。"""
     conn = _conn()
     since = (pipeline.now_tw() - timedelta(days=days)).isoformat(timespec="seconds")
-    items = db.news_items(conn, since=since, analyzed=True)
+    items = dedupe_ticks(db.news_items(conn, since=since, analyzed=True))
+    items.sort(key=lambda i: i.get("published_at") or "", reverse=True)
     conn.close()
     if sentiment:
         items = [i for i in items if i["sentiment"] == sentiment]
@@ -73,7 +75,7 @@ def news_stocks(days: int = Query(NEWS_KEEP_DAYS, ge=1, le=30)) -> list[dict]:
     """依個股彙整的利多／利空新聞則數。"""
     conn = _conn()
     since = (pipeline.now_tw() - timedelta(days=days)).isoformat(timespec="seconds")
-    items = db.news_items(conn, since=since, analyzed=True)
+    items = dedupe_ticks(db.news_items(conn, since=since, analyzed=True))
     conn.close()
     return pipeline.stock_summary(items)
 

@@ -117,7 +117,8 @@ def run(days: int = HISTORY_DAYS, *, skip_foreign: bool = False, skip_news: bool
             names.setdefault(r["code"], {"code": r["code"], "name": r["name"], "market": r["market"], "close": None})
         for item, result in zip(pending, analyze_items(pending, names)):
             db.save_analysis(conn, item["id"], result)
-        analyzed = db.news_items(conn, since=cutoff, analyzed=True)
+        analyzed = news.dedupe_ticks(db.news_items(conn, since=cutoff, analyzed=True))
+        analyzed.sort(key=lambda i: i.get("published_at") or "", reverse=True)
         counts = {k: sum(1 for i in analyzed if i["sentiment"] == k) for k in ("利多", "利空", "中性")}
         export_json(news_path, {
             "updatedAt": now_tw().isoformat(timespec="seconds"),

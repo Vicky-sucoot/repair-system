@@ -71,8 +71,24 @@ def test_longer_keyword_wins():
 def test_match_stocks_ambiguous_names_and_codes():
     assert sentiment.match_stocks("世界經濟展望", STOCKS) == []
     assert sentiment.match_stocks("世界(5347)擴產", STOCKS) == [{"code": "5347", "name": "世界"}]
+    assert sentiment.match_stocks("旺矽(6223-TW)EPS上修", {"6223": {"code": "6223", "name": "旺矽"}}) == [{"code": "6223", "name": "旺矽"}]
     assert sentiment.match_stocks("元大台灣50 成交量", STOCKS) == []  # ETF 名稱不比對
-    assert sentiment.match_stocks("無關", STOCKS, tags=["2317"]) == [{"code": "2317", "name": "鴻海"}]
+
+
+def test_match_stocks_prefers_longer_names_and_title_for_short_names():
+    stocks = {**STOCKS, "2454": {"code": "2454", "name": "聯發科"}, "1459": {"code": "1459", "name": "聯發"},
+              "2618": {"code": "2618", "name": "長榮航"}, "2603": {"code": "2603", "name": "長榮"},
+              "8923": {"code": "8923", "name": "時報"}}
+    assert sentiment.match_stocks("聯發科翻紅 長榮航看好", stocks, title="聯發科翻紅 長榮航看好") == [
+        {"code": "2454", "name": "聯發科"}, {"code": "2618", "name": "長榮航"}]
+    text = "標題 摘要提到鴻海與工商時報"
+    assert sentiment.match_stocks(text, stocks, title="標題") == []  # 兩字名稱只認標題；「時報」為常用詞
+    assert sentiment.match_stocks(text, stocks, title=None) == [{"code": "2317", "name": "鴻海"}]
+
+
+def test_source_tags_need_mention_in_text():
+    assert sentiment.match_stocks("加權指數下跌", STOCKS, tags=["2317"]) == []
+    assert sentiment.match_stocks("2317 盤中", STOCKS, tags=["2317"]) == [{"code": "2317", "name": "鴻海"}]
 
 
 class FakeMessages:

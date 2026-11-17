@@ -95,6 +95,20 @@ def parse_cnyes(payload: dict) -> list[dict]:
     return items
 
 
+def dedupe_ticks(items: list[dict]) -> list[dict]:
+    """「盤中速報－加權指數下跌 xx 點」這類每隔幾分鐘重發的快訊，同一來源只保留最新一則。"""
+    latest: dict[tuple[str, str], dict] = {}
+    rest = []
+    for item in items:
+        if re.match(r"^(盤中速報|盤後速報|鉅亨速報)", item["title"]) and "指數" in item["title"]:
+            key = (item["source"], re.sub(r"[\d.,%\-+－]+", "", item["title"]))
+            if key not in latest or (item.get("published_at") or "") > (latest[key].get("published_at") or ""):
+                latest[key] = item
+        else:
+            rest.append(item)
+    return rest + list(latest.values())
+
+
 def fetch_all() -> tuple[list[dict], list[str]]:
     """抓取所有來源；單一來源失敗不影響其他來源。回傳 (新聞, 錯誤訊息)。"""
     items, errors = [], []
@@ -104,4 +118,4 @@ def fetch_all() -> tuple[list[dict], list[str]]:
             items += parse_cnyes(resp.json()) if key == "cnyes" else parse_rss(resp.text, key)
         except Exception as error:
             errors.append(f"{cfg['name']}：{error}")
-    return items, errors
+    return dedupe_ticks(items), errors

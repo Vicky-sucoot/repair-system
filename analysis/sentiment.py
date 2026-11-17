@@ -26,7 +26,8 @@ BEARISH = [
 ]
 NEGATIONS = ("不", "未", "沒", "無", "難", "非")
 # 常見詞恰好也是股名的，只有在「名稱(代號)」寫法時才算個股
-AMBIGUOUS_NAMES = {"世界", "中華", "大同", "統一", "國產", "東元", "大成", "正新", "長興", "興富發", "全國", "台灣"}
+AMBIGUOUS_NAMES = {"世界", "中華", "大同", "統一", "國產", "東元", "大成", "正新", "長興", "興富發", "全國", "台灣",
+                   "時報", "台南", "資通", "信大", "達運", "聯發", "力積", "華新", "國票", "遠東", "台中", "新光", "第一"}
 
 
 def _count(text: str, words: list[str]) -> tuple[list[str], list[str]]:
@@ -44,21 +45,36 @@ def _count(text: str, words: list[str]) -> tuple[list[str], list[str]]:
     return found, negated
 
 
-def match_stocks(text: str, stocks: dict[str, dict], tags: list[str] | None = None) -> list[dict]:
-    """比對新聞中提到的上市櫃個股：代號、「名稱(代號)」或名稱（排除易混淆常用詞）。"""
+def match_stocks(text: str, stocks: dict[str, dict], tags: list[str] | None = None, title: str | None = None) -> list[dict]:
+    """
+    比對新聞提到的上市櫃個股：
+    - 「名稱(代號)」或「(代號)」寫法一定採用；
+    - 名稱比對時較長的名稱優先（「聯發科」不會再算到「聯發」）；
+    - 兩個字的名稱容易與一般詞混淆，只在標題中出現才採用；
+    - 來源附的個股標籤（tags）只有在內文提到該股名稱或代號時才採用。
+    """
     hits: dict[str, dict] = {}
-    for code in tags or []:
-        if code in stocks:
-            hits[code] = stocks[code]
-    for m in re.finditer(r"[(（](\d{4,6}[A-Z]?)[)）]", text):
+    for m in re.finditer(r"[(（](\d{4,6}[A-Z]?)(?:-TW)?[)）]", text):
         if m.group(1) in stocks:
             hits[m.group(1)] = stocks[m.group(1)]
-    for code, s in stocks.items():
+    taken = [False] * len(text)
+    candidates = sorted(((c, s) for c, s in stocks.items() if len(s["name"]) >= 2 and not c.startswith("0")),
+                        key=lambda cs: len(cs[1]["name"]), reverse=True)  # 0 開頭多為 ETF，名稱常與一般詞重疊
+    for code, s in candidates:
         name = s["name"]
-        if code in hits or len(name) < 2 or name in AMBIGUOUS_NAMES or code.startswith("0"):
-            continue  # 0 開頭多為 ETF，名稱常與一般詞重疊
-        if name in text:
+        for m in re.finditer(re.escape(name), text):
+            if any(taken[m.start():m.end()]):
+                continue
+            for i in range(m.start(), m.end()):
+                taken[i] = True
+            if code in hits or name in AMBIGUOUS_NAMES:
+                continue
+            if len(name) == 2 and title is not None and name not in title:
+                continue
             hits[code] = s
+    for code in tags or []:
+        if code in stocks and code not in hits and (code in text or stocks[code]["name"] in text):
+            hits[code] = stocks[code]
     return [{"code": c, "name": s["name"]} for c, s in sorted(hits.items())]
 
 
@@ -79,7 +95,7 @@ def lexicon_analyze(item: dict, stocks: dict[str, dict]) -> dict:
         "sentiment": sentiment, "score": score,
         "bullish_keywords": sorted(set(bull + [f"不{w}" for w in bear_neg])),
         "bearish_keywords": sorted(set(bear + [f"不{w}" for w in bull_neg])),
-        "stocks": [{**s, "impact": sentiment} for s in match_stocks(text, stocks, item.get("tags"))],
+        "stocks": [{**s, "impact": sentiment} for s in match_stocks(text, stocks, item.get("tags"), item.get("title", ""))],
         "reason": None, "analyzer": "lexicon",
     }
 

@@ -84,3 +84,15 @@ def test_parse_cnyes_unescapes_html_and_builds_url():
 
 def test_clean_text_truncates():
     assert len(news.clean_text("字" * 500)) == news.SUMMARY_CHARS
+
+
+def test_dedupe_ticks_keeps_latest_index_flash():
+    items = [
+        {"source": "鉅亨網", "title": "盤中速報 - 櫃買市場加權指數下跌-8.89點至310.23點，跌幅2.79%", "published_at": "2026-11-17T11:59:35+08:00"},
+        {"source": "鉅亨網", "title": "盤中速報 - 櫃買市場加權指數下跌-12.95點至306.17點，跌幅4.06%", "published_at": "2026-11-17T12:11:05+08:00"},
+        {"source": "鉅亨網", "title": "盤中速報 - 集中市場加權指數下跌-851.72點至40188.36點，跌幅2.08%", "published_at": "2026-11-17T12:15:06+08:00"},
+        {"source": "鉅亨網", "title": "營收速報 - 台產(2832)10月營收年增56%", "published_at": "2026-11-17T11:52:55+08:00"},
+    ]
+    kept = news.dedupe_ticks(items)
+    assert len(kept) == 3
+    assert any("306.17" in i["title"] for i in kept) and not any("310.23" in i["title"] for i in kept)
