@@ -18,6 +18,10 @@
 
 設定與投入紀錄只存在這台裝置瀏覽器的 localStorage，不會上傳；換裝置或清除瀏覽資料會遺失。
 
+## 畫面
+
+單頁式應用程式：畫面最下方的選項列依序為「定期定額、行情、外資動向、新聞情緒、觀察名單」，點選後只顯示該頁；網址會帶上頁面代號（例如 `#news`），並記住上次開啟的頁面。
+
 ## 股價資料
 
 「最新行情」顯示**加權指數**、**台指期夜盤**（近月、盤後交易時段）、0050、VOO 與美元匯率，點選卡片會在新視窗開啟來源網站（Yahoo 股市、期交所）查看即時報價。
@@ -75,6 +79,7 @@ API：`GET /api/recommendations`（今日觀察名單，可帶 `top_n`、`big_va
 - `src/yahoo.js`：解析 Yahoo Finance chart API
 - `src/taifex.js`：解析期交所期貨每日行情 CSV（台指期夜盤）
 - `src/intel.js`：網站的外資動向、新聞情緒區塊
+- `src/tabs.js`：底部選項列與單頁切換
 - `analysis/`：Python 爬蟲（`crawlers/`）、SQLite（`db.py`）、外資篩選（`foreign_analysis.py`）、情緒分析（`sentiment.py`）、Claude 外資解讀（`insight.py`）、綜合評分（`recommend.py`）、每日流程（`pipeline.py`）、FastAPI（`api.py`）與測試（`tests/`）
 - `dashboard/app.py`：Streamlit 儀表板
 - `src/chart.js`：SVG 走勢圖
