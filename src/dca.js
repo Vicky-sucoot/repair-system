@@ -78,8 +78,8 @@ export function xirr(flows) {
  * 每筆投入以當日（遇假日順延至下一個交易日）收盤價成交；日期晚於最新股價者列為待成交。
  * 所有 *TWD 結果皆換算為新台幣。
  */
-export function simulate(plan, series, fx = null) {
-  const asset = ASSETS[plan.symbol];
+export function simulate(plan, series, fx = null, asset = ASSETS[plan.symbol]) {
+  // asset：內建標的（0050、VOO）或使用者自行加入的台股（{ short, name, currency: 'TWD' }）
   if (!asset) throw new Error(`不支援的標的：${plan.symbol}`);
   if (!series?.dates?.length) throw new Error(`缺少 ${asset.short} 的股價資料`);
   const needsFx = asset.currency !== 'TWD';
@@ -212,4 +212,18 @@ export function combineTimelines(timelines) {
     });
     return { date: date || `${month}-01`, investedTWD, totalTWD };
   });
+}
+
+
+/**
+ * 使用者自行加入的台股沒有完整歷史價格：以各筆投入的成交價與最新收盤價組成簡易價格序列。
+ * contributions：[{ date, price }]（原始投入與每月投入）；latest：{ date, close }（最新收盤，可省略）。
+ * 未計入配息與分割。
+ */
+export function syntheticSeries(contributions, latest = null) {
+  const map = new Map();
+  for (const c of contributions) if (c.date && c.price > 0) map.set(c.date, c.price);
+  if (latest?.date && latest.close > 0 && (!map.size || latest.date >= [...map.keys()].sort().at(-1))) map.set(latest.date, latest.close);
+  const dates = [...map.keys()].sort();
+  return { dates, close: dates.map(d => map.get(d)), dividends: [] };
 }

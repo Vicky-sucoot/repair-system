@@ -1,14 +1,18 @@
-import { ASSETS, FX_SYMBOL, MARKET_DEFAULTS, simulate, combineTimelines } from './dca.js';
+import { ASSETS, FX_SYMBOL, MARKET_DEFAULTS, simulate, combineTimelines, syntheticSeries } from './dca.js';
 import { renderChart } from './chart.js';
 
 const STORAGE_KEY = 'dca-tracker-plans-v2';
 const SELECTED_KEY = 'dca-tracker-selected-plan';
 const LEGACY_KEY = 'dca-tracker-plans-v1';
 const DATA_URL = './data/prices.json';
+const QUOTES_URL = './data/quotes.json';
 const DEFAULT_PLANS = [
   { symbol: '0050.TW', startDate: '2020-01-02', initial: 100000, ...MARKET_DEFAULTS.TW, reinvest: true, entries: [] },
   { symbol: 'VOO', startDate: '2020-01-02', initial: 100000, ...MARKET_DEFAULTS.US, reinvest: true, entries: [] }
 ];
+// 使用者自行新增的台股項目
+const customDefaults = (code, name) => ({ symbol: code, name, custom: true, startDate: todayString(), initial: 0, initialPrice: null,
+  ...MARKET_DEFAULTS.TW, reinvest: false, entries: [] });
 const NUMBER_FIELDS = ['initial', 'feeRate', 'minFee', 'dividendTax'];
 const SETTING_FIELDS = ['symbol', 'startDate', ...NUMBER_FIELDS, 'initialPrice', 'wholeShares', 'reinvest'];
 
@@ -24,6 +28,7 @@ const format = {
 
 const $ = selector => document.querySelector(selector);
 let prices = null;
+let quoteData = null; // 全市場最新收盤（自訂項目的現價與名稱）
 let plans = loadPlans();
 const results = [];
 
@@ -31,11 +36,13 @@ const results = [];
 function loadPlans() {
   const read = key => { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } };
   const saved = read(STORAGE_KEY) || read(LEGACY_KEY);
-  if (Array.isArray(saved) && saved.length === DEFAULT_PLANS.length) {
-    return saved.map((p, i) => {
-      const plan = { ...DEFAULT_PLANS[i] };
+  if (Array.isArray(saved) && saved.length) {
+    return saved.filter(p => p && typeof p.symbol === 'string').map((p, i) => {
+      const custom = Boolean(p.custom) && !ASSETS[p.symbol];
+      const plan = custom ? customDefaults(p.symbol, p.name || p.symbol)
+        : { ...(DEFAULT_PLANS.find(d => d.symbol === p.symbol) || DEFAULT_PLANS[i % DEFAULT_PLANS.length]) };
       for (const key of SETTING_FIELDS) if (p?.[key] !== undefined) plan[key] = p[key];
-      if (!ASSETS[plan.symbol]) plan.symbol = DEFAULT_PLANS[i].symbol;
+      if (!custom && !ASSETS[plan.symbol]) plan.symbol = DEFAULT_PLANS[i % DEFAULT_PLANS.length].symbol;
       plan.entries = Array.isArray(p?.entries)
         ? p.entries.filter(e => e && typeof e.date === 'string' && Number(e.amount) > 0).map(e => ({ id: String(e.id), date: e.date, amount: Number(e.amount), price: Number(e.price) > 0 ? Number(e.price) : null }))
         : [];
@@ -77,9 +84,14 @@ function table(element, head, rows) {
 
 // ---------- 方案表單 ----------
 // 表單預設鎖定；按「修改」解鎖編輯，按「送出」驗證、儲存並重新計算。
-function buildPlans() {
+function assetOf(plan) {
+  return ASSETS[plan.symbol] || { short: plan.symbol, name: plan.name || plan.symbol, currency: 'TWD', market: 'TW', custom: true };
+}
+
+function buildPlans(selected) {
   const container = $('#plans');
   const template = $('#plan-template');
+  container.replaceChildren();
   plans.forEach((plan, index) => {
     const card = template.content.firstElementChild.cloneNode(true);
     card.dataset.index = index;
@@ -88,13 +100,19 @@ function buildPlans() {
     form.id = `plan-form-${index}`;
     card.querySelector('.submit-button').setAttribute('form', form.id);
     const select = form.elements.symbol;
-    for (const [symbol, asset] of Object.entries(ASSETS)) {
-      select.append(new Option(`${asset.short} ${asset.name}`, symbol));
+    const custom = Boolean(assetOf(plan).custom);
+    if (custom) {
+      select.append(new Option(`${plan.symbol} ${plan.name || ''}`, plan.symbol));
+      select.disabled = true; // 自訂項目不能改標的（刪除後重新新增）
+    } else {
+      for (const [symbol, asset] of Object.entries(ASSETS)) select.append(new Option(`${asset.short} ${asset.name}`, symbol));
     }
+    card.querySelector('.plan-custom-note').hidden = !custom;
+    card.querySelector('.delete-plan').addEventListener('click', () => deletePlan(index));
     fillForm(form, plan);
     setEditing(card, false);
     // 切換標的時先帶入該市場的預設手續費與稅率，按送出才生效。
-    select.addEventListener('change', () => {
+    if (!custom) select.addEventListener('change', () => {
       const defaults = MARKET_DEFAULTS[ASSETS[select.value].market];
       // 不同標的價格不同，清除原本輸入的成交價。
       fillForm(form, { ...readForm(form), ...defaults, symbol: select.value, initialPrice: null });
@@ -108,22 +126,78 @@ function buildPlans() {
     container.append(card);
   });
   container.querySelectorAll('input[type="date"]').forEach(input => { input.max = todayString(); });
-  setupPlanSelect();
+  refreshPlanSelect(selected);
 }
 // 投資項目下拉選單：一次只顯示一個項目的卡片。
-function setupPlanSelect() {
+function refreshPlanSelect(selected) {
   const select = $('#plan-select');
-  let selected = 0;
-  try { selected = Number(localStorage.getItem(SELECTED_KEY)) || 0; } catch { /* 忽略 */ }
+  if (selected === undefined) {
+    try { selected = Number(localStorage.getItem(SELECTED_KEY)) || 0; } catch { selected = 0; }
+  }
   if (!(selected >= 0 && selected < plans.length)) selected = 0;
   select.replaceChildren(...plans.map((_, i) => new Option('', String(i))));
   updatePlanOptions();
   select.value = String(selected);
   showPlan(selected);
-  select.addEventListener('change', () => {
-    showPlan(Number(select.value));
-    try { localStorage.setItem(SELECTED_KEY, select.value); } catch { /* 忽略 */ }
-  });
+  try { localStorage.setItem(SELECTED_KEY, String(selected)); } catch { /* 忽略 */ }
+}
+$('#plan-select').addEventListener('change', () => {
+  showPlan(Number($('#plan-select').value));
+  try { localStorage.setItem(SELECTED_KEY, $('#plan-select').value); } catch { /* 忽略 */ }
+});
+
+// ---------- 新增、刪除投資項目（台股） ----------
+function twStocks() {
+  return Object.entries(quoteData?.quotes || {}).filter(([, q]) => q[1] === 'TWSE' || q[1] === 'TPEx');
+}
+function resolveStock(input) {
+  const text = input.trim();
+  if (!text) return { error: '請輸入台股代號或名稱。' };
+  const stocks = twStocks();
+  if (!stocks.length) return { error: '報價資料尚未載入，請稍後再試。' };
+  const token = text.split(/\s+/)[0].toUpperCase();
+  const byCode = stocks.find(([c]) => c === token);
+  if (byCode) return { code: byCode[0], name: byCode[1][0] };
+  const exact = stocks.find(([, q]) => q[0] === text);
+  if (exact) return { code: exact[0], name: exact[1][0] };
+  const partial = stocks.filter(([, q]) => q[0].includes(text));
+  if (partial.length === 1) return { code: partial[0][0], name: partial[0][1][0] };
+  if (partial.length > 1) return { error: `「${text}」符合 ${partial.length} 檔，請輸入代號或從選單中選擇。` };
+  return { error: `找不到「${text}」（目前支援上市、上櫃股票與 ETF）。` };
+}
+function itemMessage(text, error = false) {
+  const m = $('#item-message');
+  m.textContent = text;
+  m.className = error ? 'error' : 'hint';
+}
+$('#item-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const result = resolveStock($('#item-input').value);
+  if (result.error) { itemMessage(result.error, true); return; }
+  const builtIn = Object.entries(ASSETS).find(([, a]) => a.short === result.code);
+  const symbol = builtIn ? builtIn[0] : result.code;
+  if (plans.some(p => p.symbol === symbol)) { itemMessage(`${result.name}（${result.code}）已在投資項目中。`, true); return; }
+  plans.push(builtIn ? { ...DEFAULT_PLANS.find(d => d.symbol === symbol), initial: 0, entries: [] } : customDefaults(result.code, result.name));
+  savePlans();
+  $('#item-input').value = '';
+  buildPlans(plans.length - 1);
+  render();
+  itemMessage(`已新增 ${result.name}（${result.code}）。請在下方「每月投入」輸入投入金額與成交價。`);
+});
+function deletePlan(index) {
+  const plan = plans[index];
+  const asset = assetOf(plan);
+  if (plans.length <= 1) { itemMessage('至少需要保留一個投資項目。', true); return; }
+  const n = plan.entries.length;
+  if (!window.confirm(`確定刪除「${asset.short} ${asset.name}」${n ? `及其 ${n} 筆投入紀錄` : ''}？刪除後無法復原。`)) return;
+  plans.splice(index, 1);
+  savePlans();
+  buildPlans(Math.max(0, index - 1));
+  render();
+  itemMessage(`已刪除 ${asset.short} ${asset.name}。`);
+}
+function fillItemOptions() {
+  $('#item-options').replaceChildren(...twStocks().map(([c, q]) => new Option(`${c} ${q[0]}`)));
 }
 function showPlan(index) {
   document.querySelectorAll('.plan').forEach(card => { card.hidden = Number(card.dataset.index) !== index; });
@@ -131,7 +205,7 @@ function showPlan(index) {
 function updatePlanOptions() {
   const select = $('#plan-select');
   plans.forEach((plan, i) => {
-    const asset = ASSETS[plan.symbol];
+    const asset = assetOf(plan);
     if (select.options[i]) select.options[i].textContent = `${asset.short} ${asset.name}`;
   });
 }
@@ -140,7 +214,7 @@ function fillForm(form, plan) {
   form.elements.startDate.value = plan.startDate;
   NUMBER_FIELDS.forEach(name => { form.elements[name].value = plan[name]; });
   form.elements.initialPrice.value = plan.initialPrice > 0 ? plan.initialPrice : '';
-  form.querySelector('.price-unit').textContent = ASSETS[plan.symbol].currency === 'USD' ? 'US$' : 'NT$';
+  form.querySelector('.price-unit').textContent = assetOf(plan).currency === 'USD' ? 'US$' : 'NT$';
   form.elements.wholeShares.checked = plan.wholeShares;
   form.elements.reinvest.checked = plan.reinvest;
 }
@@ -165,6 +239,15 @@ function submitPlan(index, card) {
   if (!form.reportValidity()) return;
   const values = readForm(form);
   const previous = plans[index];
+  if (previous.custom) {
+    // 自訂項目沒有歷史價格，原始投入須填成交價；標的固定
+    if (values.initial > 0 && !values.initialPrice) {
+      card.querySelector('.edit-status').textContent = '自訂項目有原始投入金額時，請填寫原始投入成交價。';
+      form.elements.initialPrice.focus();
+      return;
+    }
+    Object.assign(values, { symbol: previous.symbol, name: previous.name, custom: true });
+  }
   let note = '';
   // 換標的後，舊紀錄的手動成交價屬於原標的，清除後改用收盤價。
   if (values.symbol !== previous.symbol && previous.entries.some(e => e.price > 0)) {
@@ -214,7 +297,7 @@ function setupEntryForm(index, card) {
     resetEntryForm(index, card);
     render();
     card.querySelector('.entry-status').textContent =
-      `${editingId ? '已修改' : '已送出'}：${date} 投入 ${format.money(amount)}${price ? `，成交價 ${format.price(price, ASSETS[plan.symbol].currency)}` : ''}。${sameMonth ? `（${date.slice(0, 7)} 共有 ${sameMonth + 1} 筆投入）` : ''}`;
+      `${editingId ? '已修改' : '已送出'}：${date} 投入 ${format.money(amount)}${price ? `，成交價 ${format.price(price, assetOf(plan).currency)}` : ''}。${sameMonth ? `（${date.slice(0, 7)} 共有 ${sameMonth + 1} 筆投入）` : ''}`;
   });
   card.querySelector('.entry-cancel').addEventListener('click', () => {
     resetEntryForm(index, card);
@@ -310,9 +393,18 @@ function renderEntryTable(index, element, result) {
 }
 
 // ---------- 計算與顯示 ----------
+// 內建標的用完整歷史價格；自訂台股用投入成交價＋最新收盤價組成簡易序列
+function seriesFor(plan, asset) {
+  if (!asset.custom) return prices.symbols[plan.symbol];
+  const contributions = [{ date: plan.startDate, price: plan.initial > 0 ? plan.initialPrice : null },
+    ...plan.entries.map(e => ({ date: e.date, price: e.price }))];
+  const q = quoteData?.quotes?.[plan.symbol];
+  const latestDate = q ? (quoteData.dates || {})[q[1]] : null;
+  return syntheticSeries(contributions, q && latestDate ? { date: latestDate, close: q[2] } : null);
+}
 function renderPlan(index) {
   const plan = plans[index];
-  const asset = ASSETS[plan.symbol];
+  const asset = assetOf(plan);
   const card = document.querySelector(`.plan[data-index="${index}"]`);
   card.querySelector('.plan-title').textContent = `${asset.short} ${asset.name}`;
   updatePlanOptions();
@@ -325,7 +417,7 @@ function renderPlan(index) {
   results[index] = null;
   if (!prices) { tiles.replaceChildren(); renderEntryTable(index, entryTable, null); return; }
   try {
-    const r = simulate(plan, prices.symbols[plan.symbol], prices.symbols[FX_SYMBOL]);
+    const r = simulate(plan, seriesFor(plan, asset), prices.symbols[FX_SYMBOL], asset);
     results[index] = r;
     message.className = 'plan-message hint';
     const buys = r.transactions.filter(t => t.id).length;
@@ -453,9 +545,13 @@ async function loadPrices() {
     const data = await response.json();
     if (!data?.symbols || !Object.keys(data.symbols).length) throw new Error('股價資料檔內容不完整。');
     prices = data;
+    try {
+      const qr = await fetch(QUOTES_URL, { cache: 'no-cache' });
+      if (qr.ok) { quoteData = await qr.json(); fillItemOptions(); }
+    } catch { /* 自訂項目會改用最後一筆成交價 */ }
     const updated = new Date(data.updatedAt);
     const ageDays = (Date.now() - updated.getTime()) / 86400000;
-    status.textContent = `資料來源：Yahoo Finance、臺灣期貨交易所・每個交易日自動更新・更新於 ${updated.toLocaleString('zh-TW', { hour12: false })}${ageDays > 4 ? '（資料可能已過期）' : ''}`;
+    status.textContent = `資料來源：${data.source || '臺灣證券交易所、臺灣期貨交易所、Yahoo Finance'}・每個交易日自動更新・更新於 ${updated.toLocaleString('zh-TW', { hour12: false })}${ageDays > 4 ? '（資料可能已過期）' : ''}`;
     if (ageDays > 4) status.className = 'error';
     renderQuotes();
   } catch (error) {

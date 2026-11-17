@@ -15,6 +15,12 @@ def fake_twse(day: date):
             {"date": day.isoformat(), "market": "TWSE", "code": "2317", "name": "鴻海", "buy": 0, "sell": 500_000, "net": -500_000}]
 
 
+def fake_trust_twse(day: date):
+    if day.weekday() >= 5 or day == date(2026, 11, 13):
+        return []
+    return [{"date": day.isoformat(), "market": "TWSE", "code": "2317", "name": "鴻海", "buy": 300_000, "sell": 0, "net": 300_000}]
+
+
 def fake_tpex(day: date):
     return [{"date": day.isoformat(), "market": "TPEx", "code": "1815", "name": "富喬", "buy": 6_000_000, "sell": 0, "net": 6_000_000}]
 
@@ -30,6 +36,9 @@ NEWS = [
 def setup(monkeypatch, tmp_path):
     monkeypatch.setattr(foreign, "fetch_twse", fake_twse)
     monkeypatch.setattr(foreign, "fetch_tpex", fake_tpex)
+    from analysis.crawlers import trust
+    monkeypatch.setattr(trust, "fetch_twse", fake_trust_twse)
+    monkeypatch.setattr(trust, "fetch_tpex", lambda day: [])
     monkeypatch.setattr(stocks, "fetch_stock_list", lambda: [
         {"code": "2330", "name": "台積電", "market": "TWSE", "close": 1000.0},
         {"code": "2317", "name": "鴻海", "market": "TWSE", "close": 200.0}])
@@ -55,6 +64,9 @@ def test_pipeline_collects_trading_days_and_exports(monkeypatch, tmp_path):
     assert q["quotes"]["2330"] == ["台積電", "TWSE", 1000.0, None] and report["quotes"] == 3
     assert q["quotes"]["AAPL"] == ["Apple Inc.", "US", None, None] and q["aliases"] == {"AAPL": "蘋果"}
     assert q["dates"] == {}
+    t = json.loads((tmp_path / "trust.json").read_text(encoding="utf-8"))
+    assert t["date"] == "2026-11-17" and t["streaks"][0]["code"] == "2317" and t["streaks"][0]["streak_days"] == 3
+    assert t["big_trade_value"] == 1e8 and report["trust_date"] == "2026-11-17"
     n = json.loads((tmp_path / "news.json").read_text(encoding="utf-8"))
     assert n["counts"] == {"利多": 1, "利空": 1, "中性": 0}
     assert {s["code"] for s in n["stocks"]} == {"2330", "2317"}
@@ -82,6 +94,7 @@ def test_api_endpoints(monkeypatch, tmp_path):
     assert client.get("/api/health").json()["news"] == 2
     summary = client.get("/api/foreign", params={"min_days": 2}).json()
     assert summary["date"] == "2026-11-17" and summary["streaks"]
+    assert client.get("/api/trust").json()["streaks"][0]["code"] == "2317"
     history = client.get("/api/foreign/2330").json()
     assert [h["date"] for h in history["history"]] == ["2026-11-12", "2026-11-16", "2026-11-17"]
     assert client.get("/api/foreign/0000").status_code == 404

@@ -6,6 +6,8 @@ const int = new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 0 });
 let foreignData = null;
 let newsData = null;
 let foreignView = 'streaks';
+let trustData = null;
+let trustView = 'streaks';
 let newsFilter = '全部';
 
 function el(tag, text = '', className = '') {
@@ -34,12 +36,15 @@ async function loadJson(path) {
   return response.json();
 }
 
-// ---------- 外資動向 ----------
-function renderForeign() {
-  const table = $('#foreign-table');
-  document.querySelectorAll('[data-foreign]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.foreign === foreignView)));
-  if (!foreignData) { table.replaceChildren(); return; }
-  const rows = foreignData[foreignView] || [];
+// ---------- 外資動向、投信動向（相同表格格式） ----------
+function renderForeign() { renderFlowTable('#foreign-table', 'foreign', foreignData, foreignView); }
+function renderTrust() { renderFlowTable('#trust-table', 'trust', trustData, trustView); }
+
+function renderFlowTable(selector, kind, data, view) {
+  const table = $(selector);
+  document.querySelectorAll(`[data-${kind}]`).forEach(b => b.setAttribute('aria-pressed', String(b.dataset[kind] === view)));
+  if (!data) { table.replaceChildren(); return; }
+  const rows = data[view] || [];
   const thead = el('thead');
   const hr = el('tr');
   ['代號', '名稱', '買賣超(張)', '金額(億)', '連買'].forEach(h => hr.append(el('th', h)));
@@ -47,7 +52,7 @@ function renderForeign() {
   const tbody = el('tbody');
   if (!rows.length) {
     const tr = el('tr');
-    const td = el('td', foreignView === 'streaks' ? `今日沒有連續買超 ${foreignData.streak_min_days} 天以上的個股。` : '沒有資料。', 'hint');
+    const td = el('td', view === 'streaks' ? `今日沒有連續買超 ${data.streak_min_days} 天以上的個股。` : '沒有資料。', 'hint');
     td.colSpan = 5;
     tr.append(td);
     tbody.append(tr);
@@ -201,11 +206,23 @@ async function loadIntel() {
     newsStatus.className = 'error';
     newsStatus.textContent = `無法取得新聞資料：${error.message}`;
   }
+  const trustStatus = $('#trust-status');
+  try {
+    trustData = await loadJson('./data/trust.json');
+    const c = trustData.counts || {};
+    trustStatus.className = 'hint';
+    trustStatus.textContent = `${trustData.date} 投信買賣超・買超 ${c.buy ?? 0} 家、賣超 ${c.sell ?? 0} 家・連買 ${trustData.streak_min_days} 天以上 ${c.streaks ?? 0} 家・大買／大賣門檻 ${(trustData.big_trade_value / 1e8).toFixed(0)} 億元・來源：${trustData.source}`;
+  } catch (error) {
+    trustStatus.className = 'error';
+    trustStatus.textContent = `無法取得投信資料：${error.message}`;
+  }
   renderInsight();
   renderForeign();
+  renderTrust();
   renderNews();
 }
 
 document.querySelectorAll('[data-foreign]').forEach(b => b.addEventListener('click', () => { foreignView = b.dataset.foreign; renderForeign(); }));
+document.querySelectorAll('[data-trust]').forEach(b => b.addEventListener('click', () => { trustView = b.dataset.trust; renderTrust(); }));
 document.querySelectorAll('[data-news]').forEach(b => b.addEventListener('click', () => { newsFilter = b.dataset.news; renderNews(); }));
 loadIntel();

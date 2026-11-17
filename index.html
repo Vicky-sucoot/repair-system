@@ -43,6 +43,13 @@
         <label for="plan-select">投資項目</label>
         <select id="plan-select"></select>
         <p class="hint">選擇要查看或輸入每月投入的項目；上方總覽為全部項目合計。</p>
+        <form id="item-form" class="mylist-form item-form">
+          <label class="visually-hidden" for="item-input">新增投資項目（台股代號或名稱）</label>
+          <input id="item-input" list="item-options" placeholder="新增投資項目：輸入台股代號或名稱，例如 2330" autocomplete="off" enterkeyhint="done">
+          <datalist id="item-options"></datalist>
+          <button type="submit">新增</button>
+        </form>
+        <p id="item-message" class="hint" role="status" aria-live="polite"></p>
       </section>
       <div id="plans"></div>
 
@@ -105,6 +112,17 @@
         </div>
         <div class="table-wrap"><table id="foreign-table" class="intel-table"></table></div>
       </section>
+      <section class="panel intel" aria-labelledby="trust-title">
+        <div class="section-heading">
+          <div><h2 id="trust-title">投信動向</h2><p id="trust-status" class="hint" role="status">讀取中…</p></div>
+        </div>
+        <div class="segmented" role="group" aria-label="投信篩選">
+          <button type="button" data-trust="streaks" aria-pressed="true">連續買超</button>
+          <button type="button" data-trust="big_buys" aria-pressed="false">單日大買</button>
+          <button type="button" data-trust="big_sells" aria-pressed="false">單日大賣</button>
+        </div>
+        <div class="table-wrap"><table id="trust-table" class="intel-table"></table></div>
+      </section>
     </div>
 
     <div class="page" id="page-news" data-page="news" role="tabpanel" aria-label="新聞情緒">
@@ -158,6 +176,7 @@
   <template id="plan-template">
     <section class="panel plan">
       <div class="section-heading"><h2 class="plan-title"></h2><span class="badge plan-currency"></span></div>
+      <p class="plan-custom-note hint" hidden>自訂項目：以你輸入的成交價與最新收盤價計算，未計入配息與分割；原始投入有金額時請填成交價。</p>
 
       <h3>基本設定</h3>
       <form class="plan-form">
@@ -203,6 +222,7 @@
       <h3>投入紀錄（累積）</h3>
       <div class="table-wrap"><table class="entry-table"></table></div>
       <details><summary>交易紀錄（含配息）</summary><div class="table-wrap"><table class="tx-table"></table></div></details>
+      <div class="plan-delete"><button type="button" class="link-button danger delete-plan">刪除此投資項目</button></div>
     </section>
   </template>
 </body>

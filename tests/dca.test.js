@@ -157,3 +157,19 @@ test('解析 Yahoo chart 回應', () => {
   assert.equal(parsed.last.price, 61.5);
   assert.throws(() => parseYahooChart({ chart: { result: null, error: { description: 'No data' } } }), /No data/);
 });
+
+test('自訂台股：以投入成交價與最新收盤價計算', async () => {
+  const { syntheticSeries } = await import('../src/dca.js');
+  const series = syntheticSeries([{ date: '2026-09-01', price: 1000 }, { date: '2026-10-01', price: 1100 }], { date: '2026-11-17', close: 1200 });
+  assert.deepEqual(series, { dates: ['2026-09-01', '2026-10-01', '2026-11-17'], close: [1000, 1100, 1200], dividends: [] });
+  const asset = { short: '2330', name: '台積電', currency: 'TWD', market: 'TW' };
+  const plan = { symbol: '2330', startDate: '2026-09-01', initial: 100000, initialPrice: 1000, feeRate: 0, minFee: 0, wholeShares: true,
+    reinvest: false, dividendTax: 0, entries: [{ id: 'a', date: '2026-10-01', amount: 11000, price: 1100 }] };
+  const r = simulate(plan, series, null, asset);
+  assert.equal(r.shares, 110);
+  assert.equal(r.investedTWD, 111000);
+  assert.equal(r.marketValueTWD, 132000);
+  // 最新收盤早於最後一筆投入時，以最後成交價為現價
+  assert.deepEqual(syntheticSeries([{ date: '2026-11-18', price: 90 }], { date: '2026-11-17', close: 80 }).close, [90]);
+  assert.throws(() => simulate({ ...plan, symbol: 'XYZ' }, series), /不支援/);
+});

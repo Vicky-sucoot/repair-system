@@ -8,7 +8,8 @@ EXPORT_DIR = Path(os.environ.get("MARKET_EXPORT_DIR", ROOT / "data"))
 
 # 外資篩選
 STREAK_MIN_DAYS = int(os.environ.get("STREAK_MIN_DAYS", "3"))      # 連續買超至少幾天
-BIG_TRADE_VALUE = float(os.environ.get("BIG_TRADE_VALUE", "500000000"))  # 單日大買／大賣門檻（新台幣，預設 5 億）
+BIG_TRADE_VALUE = float(os.environ.get("BIG_TRADE_VALUE", "500000000"))  # 外資單日大買／大賣門檻（新台幣，預設 5 億）
+TRUST_BIG_TRADE_VALUE = float(os.environ.get("TRUST_BIG_TRADE_VALUE", "100000000"))  # 投信門檻（預設 1 億，投信規模較小）
 TOP_N = int(os.environ.get("TOP_N", "20"))
 HISTORY_DAYS = int(os.environ.get("HISTORY_DAYS", "10"))           # 每次回補的交易日數
 

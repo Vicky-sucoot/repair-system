@@ -110,3 +110,16 @@ def test_export_quotes_keeps_market_dates(tmp_path):
     q = json.loads((tmp_path / "q.json").read_text(encoding="utf-8"))
     assert q["dates"] == {"TWSE": "2026-11-16", "TPEx": "2026-11-17"}
     assert q["quotes"] == {"2330": ["台積電", "TWSE", 2215.0, -135.0], "1815": ["富喬", "TPEx", 118.0, -13.0]}
+
+
+def test_parse_trust_twse_and_tpex():
+    from analysis.crawlers import trust
+    twse = {"stat": "OK", "fields": ["", "證券代號", "證券名稱", "買進股數", "賣出股數", "買賣超股數"],
+            "data": [[" ", "2027  ", "大成鋼          ", "10,086,000", "0", "10,086,000"]]}
+    assert trust.parse_twse(twse, date(2026, 11, 16)) == [
+        {"date": "2026-11-16", "market": "TWSE", "code": "2027", "name": "大成鋼", "buy": 10086000, "sell": 0, "net": 10086000}]
+    tpex = {"tables": [{"title": "投信買賣超彙總表", "date": "115/11/16", "fields": ["排行", "代號", "名稱", "買進", "賣出", "買賣超(張數)"],
+                        "data": [["1", "6147", "頎邦            ", "8", "2,803", "-2,795"]]}]}
+    assert trust.parse_tpex(tpex, date(2026, 11, 16))[0] == {"date": "2026-11-16", "market": "TPEx", "code": "6147", "name": "頎邦",
+                                                           "buy": 8000, "sell": 2803000, "net": -2795000}
+    assert trust.parse_tpex(tpex, date(2026, 11, 13)) == []  # 回應日期與要求不符時捨棄

@@ -14,6 +14,11 @@ CREATE TABLE IF NOT EXISTS foreign_trades (
     PRIMARY KEY (date, market, code)
 );
 CREATE INDEX IF NOT EXISTS idx_foreign_code ON foreign_trades (code, date);
+CREATE TABLE IF NOT EXISTS trust_trades (
+    date TEXT NOT NULL, market TEXT NOT NULL, code TEXT NOT NULL, name TEXT NOT NULL,
+    buy INTEGER NOT NULL, sell INTEGER NOT NULL, net INTEGER NOT NULL,
+    PRIMARY KEY (date, market, code)
+);
 CREATE TABLE IF NOT EXISTS stocks (
     code TEXT PRIMARY KEY, name TEXT NOT NULL, market TEXT NOT NULL, close REAL
 );
@@ -39,24 +44,33 @@ def connect(path: Path | str = DB_PATH) -> sqlite3.Connection:
     return conn
 
 
-def upsert_foreign(conn: sqlite3.Connection, rows: list[dict]) -> int:
+TRADE_TABLES = ("foreign_trades", "trust_trades")  # 外資、投信買賣超
+
+
+def _table(table: str) -> str:
+    if table not in TRADE_TABLES:
+        raise ValueError(table)
+    return table
+
+
+def upsert_foreign(conn: sqlite3.Connection, rows: list[dict], table: str = "foreign_trades") -> int:
     conn.executemany(
-        "INSERT OR REPLACE INTO foreign_trades (date, market, code, name, buy, sell, net) "
+        f"INSERT OR REPLACE INTO {_table(table)} (date, market, code, name, buy, sell, net) "
         "VALUES (:date, :market, :code, :name, :buy, :sell, :net)", rows)
     conn.commit()
     return len(rows)
 
 
-def foreign_dates(conn: sqlite3.Connection) -> list[str]:
-    return [r[0] for r in conn.execute("SELECT DISTINCT date FROM foreign_trades ORDER BY date")]
+def foreign_dates(conn: sqlite3.Connection, table: str = "foreign_trades") -> list[str]:
+    return [r[0] for r in conn.execute(f"SELECT DISTINCT date FROM {_table(table)} ORDER BY date")]
 
 
-def has_foreign(conn: sqlite3.Connection, day: str, market: str) -> bool:
-    return conn.execute("SELECT 1 FROM foreign_trades WHERE date=? AND market=? LIMIT 1", (day, market)).fetchone() is not None
+def has_foreign(conn: sqlite3.Connection, day: str, market: str, table: str = "foreign_trades") -> bool:
+    return conn.execute(f"SELECT 1 FROM {_table(table)} WHERE date=? AND market=? LIMIT 1", (day, market)).fetchone() is not None
 
 
-def foreign_rows(conn: sqlite3.Connection, since: str | None = None) -> list[dict]:
-    sql = "SELECT * FROM foreign_trades" + (" WHERE date >= ?" if since else "") + " ORDER BY date"
+def foreign_rows(conn: sqlite3.Connection, since: str | None = None, table: str = "foreign_trades") -> list[dict]:
+    sql = f"SELECT * FROM {_table(table)}" + (" WHERE date >= ?" if since else "") + " ORDER BY date"
     return [dict(r) for r in conn.execute(sql, (since,) if since else ())]
 
 
