@@ -1,0 +1,36 @@
+name: probe data sources
+on:
+  push:
+    branches: ['claude/**']
+    paths: ['.github/workflows/probe.yml']
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: probe
+        run: |
+          UA='Mozilla/5.0 (compatible; tw-market-intel/1.0)'
+          python3 - <<'PY'
+          import json, urllib.request
+          UA = 'Mozilla/5.0 (compatible; tw-market-intel/1.0)'
+          def get(url):
+              req = urllib.request.Request(url, headers={'User-Agent': UA})
+              return urllib.request.urlopen(req, timeout=30).read().decode('utf-8', 'replace')
+          for url in ['https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date=20261113&type=ALLBUT0999&response=json',
+                      'https://www.tpex.org.tw/web/stock/aftertrading/daily_close_quotes/stk_quote_result.php?l=zh-tw&d=115/11/13',
+                      'https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQ?date=2026/11/13&type=EW&response=json']:
+              print('=====', url)
+              try:
+                  t = get(url)
+                  d = json.loads(t)
+                  print('keys', list(d.keys())[:12])
+                  tables = d.get('tables') or []
+                  for i, tb in enumerate(tables):
+                      print(i, tb.get('title'), 'fields', tb.get('fields'), 'n', len(tb.get('data') or []))
+                      if tb.get('data'): print('   row0', tb['data'][0]); print('   rowN', tb['data'][-1])
+                  for k in ('aaData', 'data', 'mmData'):
+                      if d.get(k): print(k, len(d[k]), d[k][0])
+                  if 'iTotalRecords' in d: print('total', d['iTotalRecords'])
+              except Exception as e:
+                  print('ERR', e, t[:300] if 't' in dir() else '')
+          PY
