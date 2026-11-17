@@ -39,10 +39,12 @@ def test_roc_date():
 
 
 def test_parse_stock_list_tolerates_field_names():
-    twse = [{"Date": "1151116", "Code": "2330", "Name": "台積電", "ClosingPrice": "1,450.00"}]
+    twse = [{"Date": "1151116", "Code": "2330", "Name": "台積電", "ClosingPrice": "1,450.00", "Change": "-25.0000"}]
     tpex = [{"SecuritiesCompanyCode": "1815", "CompanyName": "富喬", "Close": "55.3"}, {"Code": "", "Name": "x"}]
-    assert stocks.parse_stock_list(twse, "TWSE") == [{"code": "2330", "name": "台積電", "market": "TWSE", "close": 1450.0}]
-    assert stocks.parse_stock_list(tpex, "TPEx") == [{"code": "1815", "name": "富喬", "market": "TPEx", "close": 55.3}]
+    assert stocks.parse_stock_list(twse, "TWSE") == [{"code": "2330", "name": "台積電", "market": "TWSE", "close": 1450.0,
+                                                       "change": -25.0, "date": "2026-11-16"}]
+    assert stocks.parse_stock_list(tpex, "TPEx") == [{"code": "1815", "name": "富喬", "market": "TPEx", "close": 55.3,
+                                                       "change": None, "date": None}]
 
 
 UDN_RSS = """<?xml version="1.0" encoding="UTF-8" ?><rss version="2.0"><channel><title><![CDATA[經濟日報]]></title>

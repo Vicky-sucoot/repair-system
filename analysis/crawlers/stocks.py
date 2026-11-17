@@ -1,4 +1,4 @@
-"""上市、上櫃股票清單與最新收盤價（用於新聞個股比對與換算外資買賣金額）。"""
+"""上市、上櫃股票清單與最新收盤價（用於新聞個股比對、換算外資買賣金額，以及網站的自選清單）。"""
 from __future__ import annotations
 
 from .. import http
@@ -24,6 +24,14 @@ def _pick(item: dict, *names: str):
     return None
 
 
+def roc_to_iso(value) -> str | None:
+    """民國日期 1151116 → 2026-11-16。"""
+    text = str(value or "").strip().replace("/", "")
+    if len(text) == 7 and text.isdigit():
+        return f"{int(text[:3]) + 1911}-{text[3:5]}-{text[5:]}"
+    return None
+
+
 def parse_stock_list(items: list[dict], market: str) -> list[dict]:
     stocks = []
     for item in items or []:
@@ -32,7 +40,9 @@ def parse_stock_list(items: list[dict], market: str) -> list[dict]:
         if not code or not name:
             continue
         close = _float(_pick(item, "ClosingPrice", "Close"))
-        stocks.append({"code": str(code).strip(), "name": str(name).strip(), "market": market, "close": close})
+        change = _float(_pick(item, "Change", "Changes", "PriceChange"))
+        stocks.append({"code": str(code).strip(), "name": str(name).strip(), "market": market, "close": close,
+                       "change": change, "date": roc_to_iso(_pick(item, "Date"))})
     return stocks
 
 
