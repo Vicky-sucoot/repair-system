@@ -70,7 +70,7 @@ def test_parse_close_quotes():
                   ["9958", "世紀鋼", "1", "1", "1", "1", "1", "1", "--"]]}]}
     assert prices.parse_twse_closes(twse) == {"2330": 1450.0, "00400A": 12.86}
     assert prices.parse_twse_closes({"stat": "很抱歉"}) == {}
-    tpex = {"tables": [{"title": "上櫃股票行情", "fields": ["代號", "名稱", "收盤", "漲跌"],
+    tpex = {"tables": [{"title": "上櫃股票每日收盤行情(不含定價)", "fields": ["代號", "名稱", "收盤 ", "漲跌"],
                         "data": [["1815", "富喬", "55.30", "+1"], ["701234", "某權證", "1.2", "0"], ["00687B", "國泰20年美債", "30.1", "0"]]}]}
     assert prices.parse_tpex_closes(tpex) == {"1815": 55.3, "00687B": 30.1}
 
