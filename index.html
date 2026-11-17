@@ -25,6 +25,7 @@
     </header>
     <nav class="section-nav" aria-label="頁面導覽">
       <a href="#watch-title">觀察名單</a>
+      <a href="#backtest-title">回測</a>
       <a href="#market-title">行情</a>
       <a href="#foreign-title">外資動向</a>
       <a href="#news-title">新聞情緒</a>
@@ -49,6 +50,19 @@
         <p class="hint">綜合分數（-100～+100）＝ 55% 外資分數 ＋ 45% 新聞分數。外資分數看今日買賣超金額（20 億元為滿分、開根號計算，5 億元約一半）與連續買／賣超天數（5 天為滿分）；新聞分數為近 3 天提及該股新聞的利多／利空平均，越新的新聞權重越高，只有一則新聞時打折。只列出外資與新聞方向一致的個股；方向相反（例如外資賣、新聞利多）視為訊號分歧，不列入。ETF／ETN 不列入，大盤指數快訊不算個股新聞，同一標題只算一次。</p>
       </details>
       <p id="watch-disclaimer" class="hint disclaimer"></p>
+    </section>
+
+    <section class="panel intel" aria-labelledby="backtest-title">
+      <div class="section-heading">
+        <div><h2 id="backtest-title">回測</h2><p id="backtest-status" class="hint" role="status">讀取中…</p></div>
+      </div>
+      <h3 class="intel-sub">觀察名單實際追蹤（外資＋新聞）</h3>
+      <div class="table-wrap"><table id="backtest-combined" class="intel-table backtest-table"></table></div>
+      <h3 class="intel-sub">外資策略歷史回測（只用外資分數）</h3>
+      <div class="table-wrap"><table id="backtest-foreign" class="intel-table backtest-table"></table></div>
+      <details class="method"><summary>回測方式</summary>
+        <p class="hint">進場價為名單日期「下一個交易日」收盤價，持有 1／5／20 個交易日後以收盤價計算報酬，不含手續費、證交稅與股利。建議買入以上漲為勝；建議賣出／避開以下跌（成功避開）為勝。超額報酬＝個股報酬－同期全市場個股等權平均報酬。新聞來源沒有歷史資料，所以歷史回測只用外資分數；包含新聞的完整觀察名單從開始保存後逐日累積。過去表現不代表未來結果。</p>
+      </details>
     </section>
 
     <section class="panel market" aria-labelledby="market-title">

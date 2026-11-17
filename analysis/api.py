@@ -13,7 +13,7 @@ from . import db, pipeline
 from .crawlers.news import dedupe_ticks
 from .config import BIG_TRADE_VALUE, DB_PATH, NEWS_KEEP_DAYS, STREAK_MIN_DAYS, TOP_N
 from .foreign_analysis import analyze, stock_flows
-from . import recommend
+from . import backtest, recommend
 
 app = FastAPI(title="台股外資動向與新聞情緒 API", version="1.0.0")
 
@@ -94,6 +94,21 @@ def recommendations(top_n: int = Query(10, ge=1, le=50), big_value: float = Quer
     _, flows = stock_flows(rows, prices)
     result = recommend.build(flows, items, pipeline.now_tw().date(), top_n=top_n, big_value=big_value)
     return {"date": dates[-1] if dates else None, **result}
+
+
+@app.get("/api/backtest")
+def backtest_summary() -> dict:
+    """回測：外資策略歷史回測與觀察名單實際追蹤的 1／5／20 日報酬、勝率與超額報酬。"""
+    conn = _conn()
+    table = db.price_table(conn)
+    book = backtest.PriceBook(table)
+    result = {
+        "horizons": list(backtest.HORIZONS), "price_days": len(book.dates),
+        "foreign_only": backtest.evaluate(backtest.foreign_only_picks(db.foreign_rows(conn), table), book),
+        "combined": backtest.evaluate(db.recommendations(conn), book),
+    }
+    conn.close()
+    return result
 
 
 @app.post("/api/refresh", status_code=202)
