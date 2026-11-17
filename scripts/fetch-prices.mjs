@@ -169,7 +169,7 @@ async function fetchSox() {
 // ---------- 黃金：期交所美元黃金期貨（GDF）近月結算價 ----------
 async function fetchGold() {
   const end = new Date(Date.now() + 8 * 3600000);
-  const start = new Date(end.getTime() - 45 * 86400000);
+  const start = new Date(end.getTime() - 30 * 86400000); // 期交所一次最多查詢約一個月
   const text = await request('https://www.taifex.com.tw/cht/3/futDataDown', { method: 'POST', body: futDataDownBody(start, end, 'GDF'), minInterval: 1500, as: 'text' });
   const series = settlementSeries(parseTaifexCsv(text), 'GDF');
   if (series.length < 2) throw new Error('黃金期貨資料筆數異常');
