@@ -14,7 +14,7 @@ import pandas as pd
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from analysis import backtest, db, pipeline, recommend  # noqa: E402
+from analysis import db, pipeline, recommend  # noqa: E402
 from analysis.config import DB_PATH, EXPORT_DIR, STREAK_MIN_DAYS  # noqa: E402
 from analysis.foreign_analysis import analyze, stock_flows  # noqa: E402
 from analysis.crawlers.news import dedupe_ticks  # noqa: E402
@@ -82,56 +82,7 @@ def load_recommend(big_value: float) -> dict:
     return saved
 
 
-@st.cache_data(ttl=600)
-def load_backtest() -> dict:
-    """本機有收盤價資料時即時計算，否則讀取每日流程匯出的 backtest.json。"""
-    if DB_PATH.exists():
-        conn = db.connect(DB_PATH)
-        table = db.price_table(conn)
-        if table:
-            book = backtest.PriceBook(table)
-            result = {"horizons": list(backtest.HORIZONS), "price_days": len(book.dates),
-                      "foreign_only": backtest.evaluate(backtest.foreign_only_picks(db.foreign_rows(conn), table), book),
-                      "combined": backtest.evaluate(db.recommendations(conn), book)}
-            conn.close()
-            return result
-        conn.close()
-    path = EXPORT_DIR / "backtest.json"
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-
-
-def backtest_frame(result: dict, horizons: list) -> pd.DataFrame:
-    rows = []
-    for h in horizons:
-        b = result.get("summary", {}).get("buy", {}).get(str(h), {})
-        s_ = result.get("summary", {}).get("sell", {}).get(str(h), {})
-        pct = lambda v: None if v is None else round(v * 100, 2)  # noqa: E731
-        rows.append({"持有(日)": h, "買入筆數": b.get("n", 0), "買入平均報酬%": pct(b.get("avg_return")),
-                     "買入勝率%": pct(b.get("hit_rate")), "買入超額%": pct(b.get("avg_excess")),
-                     "賣出筆數": s_.get("n", 0), "賣出平均報酬%": pct(s_.get("avg_return")),
-                     "賣出下跌比例%": pct(s_.get("hit_rate")), "賣出超額%": pct(s_.get("avg_excess"))})
-    return pd.DataFrame(rows)
-
-
-watch_tab, backtest_tab, foreign_tab, news_tab = st.tabs(["今日觀察名單", "回測", "外資動向", "新聞情緒"])
-
-with backtest_tab:
-    bt = load_backtest()
-    if not bt:
-        st.info("尚無回測資料，請按左側「立即重新抓取並分析」（第一次需回補約 60 個交易日，約 15 分鐘）。")
-    else:
-        horizons = bt.get("horizons", [1, 5, 20])
-        st.caption(f"收盤價資料 {bt.get('price_days', 0)} 個交易日。進場價為名單隔日收盤價，不含交易成本與股利；過去表現不代表未來結果。")
-        for key, title in (("combined", "觀察名單實際追蹤（外資＋新聞）"), ("foreign_only", "外資策略歷史回測（只用外資分數）")):
-            r = bt.get(key) or {}
-            st.markdown(f"#### {title}")
-            st.caption(f"{r.get('days', 0)} 天、{r.get('picks', 0)} 筆名單（{r.get('first_date')}～{r.get('last_date')}）")
-            st.dataframe(backtest_frame(r, horizons), hide_index=True, width="stretch")
-            if r.get("recent"):
-                with st.expander("最近名單與報酬"):
-                    st.dataframe(pd.DataFrame(r["recent"]), hide_index=True, width="stretch")
-        with st.expander("回測方式"):
-            st.markdown(backtest.__doc__)
+watch_tab, foreign_tab, news_tab = st.tabs(["今日觀察名單", "外資動向", "新聞情緒"])
 
 with watch_tab:
     rec = load_recommend(big_value_e * 1e8)

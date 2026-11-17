@@ -11,7 +11,6 @@ STREAK_MIN_DAYS = int(os.environ.get("STREAK_MIN_DAYS", "3"))      # 連續買�
 BIG_TRADE_VALUE = float(os.environ.get("BIG_TRADE_VALUE", "500000000"))  # 單日大買／大賣門檻（新台幣，預設 5 億）
 TOP_N = int(os.environ.get("TOP_N", "20"))
 HISTORY_DAYS = int(os.environ.get("HISTORY_DAYS", "10"))           # 每次回補的交易日數
-BACKTEST_DAYS = int(os.environ.get("BACKTEST_DAYS", "60"))         # 回測保存的交易日數（外資與收盤價）
 
 # 新聞
 NEWS_KEEP_DAYS = int(os.environ.get("NEWS_KEEP_DAYS", "3"))

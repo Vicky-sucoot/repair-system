@@ -24,13 +24,6 @@ CREATE TABLE IF NOT EXISTS news (
     stocks TEXT, reason TEXT, analyzer TEXT, fetched_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_news_published ON news (published_at);
-CREATE TABLE IF NOT EXISTS prices (
-    date TEXT NOT NULL, code TEXT NOT NULL, close REAL NOT NULL, PRIMARY KEY (date, code)
-);
-CREATE TABLE IF NOT EXISTS recommendations (
-    date TEXT NOT NULL, side TEXT NOT NULL, code TEXT NOT NULL, name TEXT NOT NULL, score INTEGER NOT NULL,
-    PRIMARY KEY (date, side, code)
-);
 """
 
 JSON_FIELDS = ("tags", "bullish_keywords", "bearish_keywords", "stocks")
@@ -120,33 +113,3 @@ def news_items(conn: sqlite3.Connection, since: str | None = None, analyzed: boo
 def delete_news_before(conn: sqlite3.Connection, cutoff: str) -> None:
     conn.execute("DELETE FROM news WHERE published_at < ?", (cutoff,))
     conn.commit()
-
-
-def has_prices(conn: sqlite3.Connection, day: str) -> bool:
-    return conn.execute("SELECT 1 FROM prices WHERE date=? LIMIT 1", (day,)).fetchone() is not None
-
-
-def upsert_prices(conn: sqlite3.Connection, day: str, closes: dict[str, float]) -> None:
-    conn.executemany("INSERT OR REPLACE INTO prices (date, code, close) VALUES (?, ?, ?)",
-                     [(day, code, close) for code, close in closes.items()])
-    conn.commit()
-
-
-def price_table(conn: sqlite3.Connection, since: str | None = None) -> dict[str, dict[str, float]]:
-    out: dict[str, dict[str, float]] = {}
-    sql = "SELECT date, code, close FROM prices" + (" WHERE date >= ?" if since else "")
-    for d, code, close in conn.execute(sql, (since,) if since else ()):
-        out.setdefault(d, {})[code] = close
-    return out
-
-
-def save_recommendations(conn: sqlite3.Connection, day: str, picks: list[dict]) -> None:
-    """同一個外資資料日期只保留最新一版名單。"""
-    conn.execute("DELETE FROM recommendations WHERE date=?", (day,))
-    conn.executemany("INSERT OR REPLACE INTO recommendations (date, side, code, name, score) VALUES (:date, :side, :code, :name, :score)",
-                     [{**p, "date": day} for p in picks])
-    conn.commit()
-
-
-def recommendations(conn: sqlite3.Connection) -> list[dict]:
-    return [dict(r) for r in conn.execute("SELECT * FROM recommendations ORDER BY date, side, score DESC")]
