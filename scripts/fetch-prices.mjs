@@ -10,7 +10,8 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYahooChart, chartUrl } from '../src/yahoo.js';
-import { parseTaifexCsv, nightSessionSeries, futDataDownBody, parseFxCsv, fxDataDownBody } from '../src/taifex.js';
+import { parseTaifexCsv, nightSessionSeries, settlementSeries, futDataDownBody, parseFxCsv, fxDataDownBody } from '../src/taifex.js';
+import { parseCnyesHistory, cnyesHistoryUrl } from '../src/cnyes.js';
 import { parseStockDay, parseDividends, parseIndexHistory, detectSplits, adjustForSplits, monthStarts } from '../src/twse.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -157,6 +158,24 @@ async function fetchYahoo(symbol, days = null) {
   throw new Error(`${symbol} 下載失敗：${lastError?.message}`);
 }
 
+// ---------- 費城半導體指數：鉅亨網（robots.txt 未禁止） ----------
+async function fetchSox() {
+  const json = await request(cnyesHistoryUrl('GI:SOX:INDEX', 70), { minInterval: 1500 });
+  const points = parseCnyesHistory(json).slice(-45);
+  if (points.length < 2) throw new Error('費城半導體指數資料筆數異常');
+  return { name: '費城半導體指數', source: '鉅亨網', ...unzip(points) };
+}
+
+// ---------- 黃金：期交所美元黃金期貨（GDF）近月結算價 ----------
+async function fetchGold() {
+  const end = new Date(Date.now() + 8 * 3600000);
+  const start = new Date(end.getTime() - 45 * 86400000);
+  const text = await request('https://www.taifex.com.tw/cht/3/futDataDown', { method: 'POST', body: futDataDownBody(start, end, 'GDF'), minInterval: 1500, as: 'text' });
+  const series = settlementSeries(parseTaifexCsv(text), 'GDF');
+  if (series.length < 2) throw new Error('黃金期貨資料筆數異常');
+  return { name: '美元黃金期貨（近月結算價）', source: '臺灣期貨交易所', series };
+}
+
 // ---------- 台指期夜盤：期交所 ----------
 async function fetchNightSession() {
   const end = new Date(Date.now() + 8 * 3600000); // 台灣日期
@@ -179,7 +198,7 @@ try { previous = JSON.parse(await readFile(output, 'utf8')); } catch { /* 第一
 
 const data = {
   updatedAt: new Date().toISOString(),
-  source: '臺灣證券交易所（0050、加權指數）、臺灣期貨交易所（匯率、夜盤）、Yahoo Finance（VOO）',
+  source: '臺灣證券交易所（0050、加權指數）、臺灣期貨交易所（匯率、夜盤、黃金）、鉅亨網（費城半導體）、Yahoo Finance（VOO）',
   symbols: {}, indices: {},
 };
 const jobs = [
@@ -188,6 +207,8 @@ const jobs = [
   ['symbols', 'TWD=X', () => fetchFx(previous.symbols?.['TWD=X'])],
   ['indices', 'TWII', fetchTwii],
   ['indices', 'TX_NIGHT', fetchNightSession],
+  ['indices', 'SOX', fetchSox],
+  ['indices', 'GOLD', fetchGold],
 ];
 const failures = [];
 for (const [group, key, job] of jobs) {

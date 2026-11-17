@@ -6,12 +6,18 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test
+      - run: node scripts/fetch-prices.mjs
       - run: |
-          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36'
-          for u in https://ws.api.cnyes.com/robots.txt https://invest.cnyes.com/robots.txt; do
-            echo "=== $u"; curl -sS -m 20 -A "$UA" -o /tmp/r -w 'HTTP %{http_code}\n' "$u"; head -c 600 /tmp/r; echo; done
-          T=$(date +%s); F=$((T-86400*10))
-          for s in GF:GCCOMEX:FUTURES GF:GC:FUTURES FX:XAU:FOREX FX:XAUUSD:CURRENCY CM:GC:COMMODITY GI:GOLD:INDEX FX:XAUUSDX:FOREX GF:GCZ26:FUTURES; do
-            u="https://ws.api.cnyes.com/ws/api/v1/charting/history?symbol=$s&resolution=D&quote=1&from=$T&to=$F"
-            echo "=== $s"; curl -sS -m 20 -A "$UA" "$u" | head -c 700; echo; done
-          for p in futures/GF/GCCOMEX forex/detail/XAUUSD; do echo "=== page $p"; curl -sS -m 20 -A "$UA" "https://invest.cnyes.com/$p" | grep -o '[A-Z]\{2,3\}:[A-Z0-9]\{2,12\}:[A-Z]\{4,9\}' | sort -u | head; done
+          node -e "
+          const d = require('./data/prices.json');
+          console.log(d.source);
+          const s = d.indices.SOX; console.log('SOX', s.source, s.dates.length, s.dates.slice(-3), s.close.slice(-3));
+          console.log('GOLD', JSON.stringify(d.indices.GOLD.series.slice(-3)));
+          for (const k of ['0050.TW', 'VOO', 'TWD=X']) console.log(k, d.symbols[k].source, d.symbols[k].dates.at(-1));
+          console.log('TWII', d.indices.TWII.dates.at(-1), 'NIGHT', d.indices.TX_NIGHT.series.at(-1).date);
+          "
