@@ -112,6 +112,21 @@ async function fetchTwii() {
 }
 
 // ---------- 美元兌新台幣：期交所每日外幣參考匯率 ----------
+/** 期交所偶爾回應錯誤頁（不是 CSV），稍等後重試，避免單月失敗讓整段回補作廢。 */
+async function fxMonth(start, end) {
+  let lastError;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (attempt) await sleep(10000 * attempt);
+    try {
+      const text = await request('https://www.taifex.com.tw/cht/3/dailyFXRateDown', { method: 'POST', body: fxDataDownBody(start, end), minInterval: 1500, as: 'text' });
+      return parseFxCsv(text);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw new Error(`${start}～${end}：${lastError.message}`);
+}
+
 async function fetchFx(prev) {
   const incremental = prev?.source === 'taifex';
   const stored = incremental ? zip(prev) : [];
@@ -119,8 +134,7 @@ async function fetchFx(prev) {
   let raw = [];
   for (const month of monthStarts(from, todayTw())) {
     const [start, end] = monthRange(month);
-    const text = await request('https://www.taifex.com.tw/cht/3/dailyFXRateDown', { method: 'POST', body: fxDataDownBody(start, end), minInterval: 1500, as: 'text' });
-    raw = raw.concat(parseFxCsv(text));
+    raw = raw.concat(await fxMonth(start, end));
   }
   const points = merge(stored, raw);
   if (points.length < 20) throw new Error('匯率資料筆數異常');
