@@ -8,6 +8,7 @@
   - 每則新聞對該股的影響：利多 +|分數|、利空 −|分數|（至少 0.3）、中性 0。
   - 時間權重：當天 1、前一天 0.6、前兩天 0.36…；可信度＝min(1, 權重總和 ÷ 1.5)，只有一則新聞時打折。
 - 綜合分數＝100 ×（0.55 × F + 0.45 × N）。
+- 只列個股（排除 0 開頭的 ETF／ETN）；大盤指數快訊不計入個股新聞，同一標題只算一次。
 - 建議買入：外資買超（F > 0）且新聞偏多（N > 0），依綜合分數由高到低。
 - 建議賣出／避開：外資賣超（F < 0）且新聞偏空（N < 0），依綜合分數由低到高。
 
@@ -16,6 +17,7 @@
 from __future__ import annotations
 
 import math
+import re
 from collections import defaultdict
 from datetime import date, datetime
 
@@ -52,15 +54,33 @@ def _day(value: str | None) -> date | None:
         return None
 
 
+INDEX_FLASH = re.compile(r"^(盤中速報|盤後速報|鉅亨速報).{0,12}指數")
+
+
+def is_etf(code: str) -> bool:
+    """0 開頭為 ETF／ETN（含槓桿、反向），觀察名單只列個股。"""
+    return code.startswith("0")
+
+
 def news_signals(items: list[dict], today: date) -> dict[str, dict]:
-    """依個股彙整新聞情緒：加權分數、利多／利空則數、關鍵字與標題。"""
+    """
+    依個股彙整新聞情緒：加權分數、利多／利空則數、關鍵字與標題。
+    大盤指數快訊（如「盤中速報－加權指數下跌」）不是個股新聞，不計入；同一檔股票重複的標題只算一次。
+    """
+    seen: set[tuple[str, str]] = set()
     acc: dict[str, dict] = defaultdict(lambda: {"weighted": 0.0, "weight": 0.0, "bullish": 0, "bearish": 0, "neutral": 0,
                                                 "bull_words": [], "bear_words": [], "headlines": []})
     for item in items:
+        if INDEX_FLASH.match(item.get("title", "")):
+            continue
         published = _day(item.get("published_at")) or today
         w = RECENCY_DECAY ** max(0, (today - published).days)
         magnitude = max(abs(item.get("score") or 0), 0.3)
         for s in item.get("stocks") or []:
+            key = (s["code"], re.sub(r"\s+", "", item.get("title", "")))
+            if key in seen:
+                continue
+            seen.add(key)
             impact = s.get("impact") or item.get("sentiment")
             v = magnitude if impact == "利多" else -magnitude if impact == "利空" else 0.0
             a = acc[s["code"]]
@@ -94,7 +114,11 @@ def news_signals(items: list[dict], today: date) -> dict[str, dict]:
 
 def _amount(flow: dict) -> str:
     lots = f"{abs(flow['net_lots']):,} 張"
-    return f"{lots}（約 {abs(flow['net_value']) / 1e8:.1f} 億元）" if flow.get("net_value") is not None else lots
+    if flow.get("net_value") is None:
+        return lots
+    value = abs(flow["net_value"])
+    money = f"{value / 1e8:.1f} 億元" if value >= 1e8 else f"{round(value / 1e4):,} 萬元"
+    return f"{lots}（約 {money}）"
 
 
 def rule_reason(entry: dict, side: str) -> str:
@@ -119,6 +143,8 @@ def build(flows: list[dict], news_items: list[dict], today: date, *, top_n: int 
     signals = news_signals(news_items, today)
     candidates = []
     for flow in flows:
+        if is_etf(flow["code"]):
+            continue
         sig = signals.get(flow["code"])
         if not sig:
             continue  # 需同時有外資與新聞訊號

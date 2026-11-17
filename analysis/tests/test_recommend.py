@@ -123,3 +123,21 @@ def test_pipeline_exports_recommendations_and_api(monkeypatch, tmp_path):
     monkeypatch.setattr(api, "DB_PATH", db_path)
     body = TestClient(api.app).get("/api/recommendations").json()
     assert [c["code"] for c in body["buy"]] == ["2330"] and body["sell"][0]["name"] == "鴻海"
+
+
+def test_news_signals_skip_index_flashes_and_duplicate_titles():
+    items = [news("盤中速報 - 集中市場加權指數下跌-851.72點", "利空", 1.0, [("2368", "金像電")]),
+             news("鉅亨速報 - Factset 最新調查：旺矽EPS上修", "利多", 1.0, [("6223", "旺矽")]),
+             news("鉅亨速報 - Factset 最新調查：旺矽EPS上修", "利多", 1.0, [("6223", "旺矽")])]
+    sig = recommend.news_signals(items, TODAY)
+    assert "2368" not in sig
+    assert sig["6223"]["bullish"] == 1
+
+
+def test_build_excludes_etfs_and_formats_small_amounts():
+    flows = [flow("00631L", "元大台灣50正2", -23982, -6.7e8, sell_streak=2), flow("3289", "宜特", 109, 1.2e7, streak=3)]
+    items = [news("台股大跌 正2爆量", "利空", 1.0, [("00631L", "元大台灣50正2")]),
+             news("宜特獲利雙升", "利多", 0.8, [("3289", "宜特")], bull=["獲利"])]
+    r = recommend.build(flows, items, TODAY)
+    assert r["sell"] == [] and r["candidates"] == 1
+    assert r["buy"][0]["reason"].startswith("外資連買 3 天、今日買超 109 張（約 1,200 萬元）")
