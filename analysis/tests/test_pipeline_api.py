@@ -5,7 +5,7 @@ from datetime import date
 from fastapi.testclient import TestClient
 
 from analysis import api, db, pipeline
-from analysis.crawlers import foreign, news, stocks
+from analysis.crawlers import foreign, news, prices, stocks
 
 
 def fake_twse(day: date):
@@ -30,6 +30,8 @@ NEWS = [
 def setup(monkeypatch, tmp_path):
     monkeypatch.setattr(foreign, "fetch_twse", fake_twse)
     monkeypatch.setattr(foreign, "fetch_tpex", fake_tpex)
+    monkeypatch.setattr(prices, "fetch_closes", lambda day: {"2330": 1000.0 + day.day, "2317": 200.0 - day.day, "1815": 55.0})
+    monkeypatch.setattr(pipeline, "BACKTEST_DAYS", 0)
     monkeypatch.setattr(stocks, "fetch_stock_list", lambda: [
         {"code": "2330", "name": "台積電", "market": "TWSE", "close": 1000.0},
         {"code": "2317", "name": "鴻海", "market": "TWSE", "close": 200.0}])

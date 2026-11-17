@@ -11,11 +11,11 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from . import db
-from .config import DB_PATH, EXPORT_DIR, HISTORY_DAYS, NEWS_KEEP_DAYS
-from .crawlers import foreign, news, stocks
+from .config import BACKTEST_DAYS, DB_PATH, EXPORT_DIR, HISTORY_DAYS, NEWS_KEEP_DAYS
+from .crawlers import foreign, news, prices, stocks
 from .crawlers.news import TW
 from .foreign_analysis import analyze, stock_flows
-from . import recommend
+from . import backtest, recommend
 from .insight import generate as generate_insight
 from .sentiment import analyze_items, llm_available
 
@@ -24,8 +24,8 @@ def now_tw() -> datetime:
     return datetime.now(TW)
 
 
-def collect_foreign(conn, days: int, today: date | None = None) -> list[str]:
-    """往回補齊最近 days 個有資料的交易日（已存在的日期不重抓）。"""
+def collect_foreign(conn, days: int, today: date | None = None, with_prices: bool = True) -> list[str]:
+    """往回補齊最近 days 個有資料的交易日的外資買賣超與收盤價（已存在的日期不重抓）。"""
     today = today or now_tw().date()
     found: list[str] = []
     day, tried = today, 0
@@ -45,6 +45,11 @@ def collect_foreign(conn, days: int, today: date | None = None) -> list[str]:
                         db.upsert_foreign(conn, foreign.fetch_tpex(day))
                     except Exception as error:
                         print(f"櫃買中心 {iso} 下載失敗：{error}")
+                if with_prices and not db.has_prices(conn, iso):
+                    try:
+                        db.upsert_prices(conn, iso, prices.fetch_closes(day))
+                    except Exception as error:
+                        print(f"{iso} 收盤價下載失敗：{error}")
         day -= timedelta(days=1)
     return sorted(found)
 
@@ -83,9 +88,49 @@ def export_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
 
 
+def history_path(export_dir: Path) -> Path:
+    return export_dir / "recommend_history.json"
+
+
+def import_history(conn, export_dir: Path) -> None:
+    """載入已提交的觀察名單歷史（GitHub Actions 的資料庫快取可能過期，名單歷史以 JSON 保存在儲存庫）。"""
+    path = history_path(export_dir)
+    if not path.exists():
+        return
+    try:
+        picks = json.loads(path.read_text(encoding="utf-8")).get("picks") or []
+    except (OSError, ValueError):
+        return
+    by_date: dict[str, list[dict]] = defaultdict(list)
+    for p in picks:
+        by_date[p["date"]].append(p)
+    for day, rows in by_date.items():
+        db.save_recommendations(conn, day, rows)
+
+
+def run_backtest(conn, export_dir: Path) -> dict:
+    table = db.price_table(conn)
+    book = backtest.PriceBook(table)
+    history = db.recommendations(conn)
+    result = {
+        "updatedAt": now_tw().isoformat(timespec="seconds"),
+        "horizons": list(backtest.HORIZONS),
+        "price_days": len(book.dates),
+        "price_range": [book.dates[0], book.dates[-1]] if book.dates else None,
+        "foreign_only": backtest.evaluate(backtest.foreign_only_picks(db.foreign_rows(conn), table), book),
+        "combined": backtest.evaluate(history, book),
+        "notes": backtest.__doc__.strip(),
+    }
+    export_json(export_dir / "backtest.json", result)
+    export_json(history_path(export_dir), {"updatedAt": result["updatedAt"], "picks": history})
+    return result
+
+
 def run(days: int = HISTORY_DAYS, *, skip_foreign: bool = False, skip_news: bool = False,
-        db_path: Path = DB_PATH, export_dir: Path = EXPORT_DIR) -> dict:
+        db_path: Path = DB_PATH, export_dir: Path = EXPORT_DIR, backtest_days: int | None = None) -> dict:
+    backtest_days = BACKTEST_DAYS if backtest_days is None else backtest_days
     conn = db.connect(db_path)
+    import_history(conn, export_dir)
     report: dict = {"errors": []}
     stock_list = stocks.fetch_stock_list()
     if stock_list:
@@ -94,7 +139,7 @@ def run(days: int = HISTORY_DAYS, *, skip_foreign: bool = False, skip_news: bool
 
     foreign_result = None
     if not skip_foreign:
-        dates = collect_foreign(conn, days)
+        dates = collect_foreign(conn, max(days, backtest_days))[-days:]
         if dates:
             rows = [r for r in db.foreign_rows(conn, since=dates[0]) if r["date"] in set(dates)]
             prices = {code: s["close"] for code, s in smap.items()}
@@ -153,6 +198,11 @@ def run(days: int = HISTORY_DAYS, *, skip_foreign: bool = False, skip_news: bool
             export_json(export_dir / "recommend.json", {"updatedAt": now_tw().isoformat(timespec="seconds"),
                                                         "date": foreign_result["date"], **rec})
             report["recommend"] = {"buy": len(rec["buy"]), "sell": len(rec["sell"])}
+            db.save_recommendations(conn, foreign_result["date"],
+                                    [{"side": side, "code": c["code"], "name": c["name"], "score": c["score"]}
+                                     for side in ("buy", "sell") for c in rec[side]])
+        bt = run_backtest(conn, export_dir)
+        report["backtest"] = {k: bt[k]["picks"] for k in ("foreign_only", "combined")}
     conn.close()
     return report
 
