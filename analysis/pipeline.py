@@ -1,0 +1,148 @@
+"""每日資料流程：抓取外資買賣超與財經新聞 → 存入 SQLite → 分析 → 匯出 JSON 給網站。
+
+執行：python -m analysis.pipeline [--days 10] [--skip-foreign] [--skip-news]
+"""
+from __future__ import annotations
+
+import argparse
+import json
+from collections import defaultdict
+from datetime import date, datetime, timedelta
+from pathlib import Path
+
+from . import db
+from .config import DB_PATH, EXPORT_DIR, HISTORY_DAYS, NEWS_KEEP_DAYS
+from .crawlers import foreign, news, stocks
+from .crawlers.news import TW
+from .foreign_analysis import analyze
+from .sentiment import analyze_items, llm_available
+
+
+def now_tw() -> datetime:
+    return datetime.now(TW)
+
+
+def collect_foreign(conn, days: int, today: date | None = None) -> list[str]:
+    """往回補齊最近 days 個有資料的交易日（已存在的日期不重抓）。"""
+    today = today or now_tw().date()
+    found: list[str] = []
+    day, tried = today, 0
+    while len(found) < days and tried < days * 2 + 7:
+        tried += 1
+        if day.weekday() < 5:
+            iso = day.isoformat()
+            if not db.has_foreign(conn, iso, "TWSE"):
+                try:
+                    db.upsert_foreign(conn, foreign.fetch_twse(day))
+                except Exception as error:
+                    print(f"證交所 {iso} 下載失敗：{error}")
+            if db.has_foreign(conn, iso, "TWSE"):
+                found.append(iso)
+                if not db.has_foreign(conn, iso, "TPEx"):
+                    try:
+                        db.upsert_foreign(conn, foreign.fetch_tpex(day))
+                    except Exception as error:
+                        print(f"櫃買中心 {iso} 下載失敗：{error}")
+        day -= timedelta(days=1)
+    return sorted(found)
+
+
+def stock_summary(items: list[dict]) -> list[dict]:
+    """依個股彙整新聞情緒：利多／利空／中性則數與最新標題。"""
+    agg: dict[str, dict] = defaultdict(lambda: {"bullish": 0, "bearish": 0, "neutral": 0, "headlines": []})
+    for item in items:
+        for s in item.get("stocks") or []:
+            a = agg[s["code"]]
+            a.update(code=s["code"], name=s["name"])
+            key = {"利多": "bullish", "利空": "bearish"}.get(s.get("impact") or item["sentiment"], "neutral")
+            a[key] += 1
+            if len(a["headlines"]) < 3:
+                a["headlines"].append({"title": item["title"], "url": item["url"], "sentiment": item["sentiment"]})
+    rows = [dict(v, total=v["bullish"] + v["bearish"] + v["neutral"], net=v["bullish"] - v["bearish"]) for v in agg.values()]
+    return sorted(rows, key=lambda r: (r["total"], abs(r["net"])), reverse=True)
+
+
+def import_news_json(conn, path: Path) -> None:
+    """載入上次匯出的新聞與分析結果，避免重複分析（GitHub Actions 每次都是全新環境）。"""
+    if not path.exists():
+        return
+    try:
+        items = json.loads(path.read_text(encoding="utf-8")).get("items") or []
+    except (OSError, ValueError):
+        return
+    db.upsert_news(conn, items)
+    for item in items:
+        if item.get("sentiment"):
+            db.save_analysis(conn, item["id"], item)
+
+
+def export_json(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
+
+
+def run(days: int = HISTORY_DAYS, *, skip_foreign: bool = False, skip_news: bool = False,
+        db_path: Path = DB_PATH, export_dir: Path = EXPORT_DIR) -> dict:
+    conn = db.connect(db_path)
+    report: dict = {"errors": []}
+    stock_list = stocks.fetch_stock_list()
+    if stock_list:
+        db.upsert_stocks(conn, stock_list)
+    smap = db.stock_map(conn)
+
+    if not skip_foreign:
+        dates = collect_foreign(conn, days)
+        if dates:
+            rows = [r for r in db.foreign_rows(conn, since=dates[0]) if r["date"] in set(dates)]
+            prices = {code: s["close"] for code, s in smap.items()}
+            result = analyze(rows, prices)
+            export_json(export_dir / "foreign.json", {"updatedAt": now_tw().isoformat(timespec="seconds"),
+                                                      "source": "臺灣證券交易所、證券櫃檯買賣中心", **result})
+            report["foreign_date"] = result["date"]
+        else:
+            report["errors"].append("沒有取得任何外資買賣超資料")
+
+    if not skip_news:
+        news_path = export_dir / "news.json"
+        import_news_json(conn, news_path)
+        items, errors = news.fetch_all()
+        report["errors"] += errors
+        db.upsert_news(conn, items)
+        cutoff = (now_tw() - timedelta(days=NEWS_KEEP_DAYS)).isoformat(timespec="seconds")
+        db.delete_news_before(conn, cutoff)
+        pending = db.news_items(conn, analyzed=False)
+        # 名稱比對用：股票清單＋外資表中出現過的名稱
+        names = dict(smap)
+        for r in db.foreign_rows(conn):
+            names.setdefault(r["code"], {"code": r["code"], "name": r["name"], "market": r["market"], "close": None})
+        for item, result in zip(pending, analyze_items(pending, names)):
+            db.save_analysis(conn, item["id"], result)
+        analyzed = db.news_items(conn, since=cutoff, analyzed=True)
+        counts = {k: sum(1 for i in analyzed if i["sentiment"] == k) for k in ("利多", "利空", "中性")}
+        export_json(news_path, {
+            "updatedAt": now_tw().isoformat(timespec="seconds"),
+            "sources": [s["name"] for s in news.SOURCES.values()],
+            "analyzer": "llm" if llm_available() else "lexicon",
+            "counts": counts, "stocks": stock_summary(analyzed)[:30],
+            "items": [{k: i[k] for k in ("id", "source", "title", "url", "summary", "published_at", "tags", "sentiment",
+                                         "score", "bullish_keywords", "bearish_keywords", "stocks", "reason", "analyzer")}
+                      for i in analyzed],
+        })
+        report["news"] = len(analyzed)
+        report["news_new"] = len(pending)
+    conn.close()
+    return report
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="抓取外資買賣超與財經新聞並分析")
+    parser.add_argument("--days", type=int, default=HISTORY_DAYS, help="回補的交易日數")
+    parser.add_argument("--skip-foreign", action="store_true")
+    parser.add_argument("--skip-news", action="store_true")
+    args = parser.parse_args()
+    report = run(args.days, skip_foreign=args.skip_foreign, skip_news=args.skip_news)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()
