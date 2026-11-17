@@ -1,3 +1,7 @@
 outputs/
 tmp/
 temp/
+data/market.db
+__pycache__/
+.venv/
+.pytest_cache/

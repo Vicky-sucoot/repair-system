@@ -2,11 +2,11 @@
 
 ## 專案結構
 
-純前端靜態網站（GitHub Pages），不需建置。頁面為 `index.html`、`style.css`；邏輯放在 `src/`（`dca.js` 為試算核心純函式，`yahoo.js` 解析股價 API，`taifex.js` 解析期交所夜盤資料，`chart.js` 繪圖，`app.js` 處理畫面）；資料下載腳本放在 `scripts/`，產生的股價資料為 `data/prices.json`（由 GitHub Actions 更新，請勿手動編輯）；測試放在 `tests/`，檔名為 `*.test.js`。
+純前端靜態網站（GitHub Pages），不需建置。頁面為 `index.html`、`style.css`；邏輯放在 `src/`（`dca.js` 為試算核心純函式，`yahoo.js` 解析股價 API，`taifex.js` 解析期交所夜盤資料，`chart.js` 繪圖，`app.js` 處理畫面）；資料下載腳本放在 `scripts/`，產生的股價資料為 `data/prices.json`（由 GitHub Actions 更新，請勿手動編輯）；測試放在 `tests/`，檔名為 `*.test.js`。Python 後端在 `analysis/`（爬蟲 `crawlers/`、SQLite `db.py`、FastAPI `api.py`、每日流程 `pipeline.py`），測試在 `analysis/tests/`（pytest）；Streamlit 儀表板在 `dashboard/`；`data/foreign.json`、`data/news.json` 由 GitHub Actions 產生。
 
 ## 建置、測試與開發指令
 
-需要 Node.js 20 以上，無相依套件。`npm test` 執行全部測試，`node --test tests/dca.test.js` 執行單一檔案；`npm run serve` 在 http://localhost:8000 預覽；`npm run fetch-prices` 下載最新股價。提交前可執行 `git diff --check` 檢查空白字元。
+需要 Node.js 20 以上（網站，無相依套件）與 Python 3.11 以上（後端，`pip install -r requirements.txt`）。`npm test` 執行全部測試，`node --test tests/dca.test.js` 執行單一檔案；`npm run serve` 在 http://localhost:8000 預覽；`npm run fetch-prices` 下載最新股價；`python -m pytest analysis/tests` 執行 Python 測試，`python -m analysis.pipeline` 抓取外資與新聞，`uvicorn analysis.api:app` 啟動 API，`streamlit run dashboard/app.py` 開啟儀表板。提交前可執行 `git diff --check` 檢查空白字元。
 
 ## 程式碼風格與命名
 

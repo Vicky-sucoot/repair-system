@@ -18,7 +18,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: update-prices
+  group: data-commit
   cancel-in-progress: false
 
 jobs:
@@ -40,5 +40,6 @@ jobs:
             echo "資料沒有變化"
           else
             git commit -m "Update price data"
-            git push
+            for i in 1 2 3; do git pull --rebase origin main && git push && exit 0; sleep 5; done
+            exit 1
           fi

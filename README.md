@@ -29,12 +29,43 @@
 - 單一標的下載失敗時沿用上一版資料；全部失敗則不更新。
 - 網站顯示資料更新時間，超過 4 天未更新會提示資料可能已過期。
 
+## 外資動向與新聞情緒（Python）
+
+網站上的「外資動向」「財經新聞情緒」兩區，由 `analysis/`（Python）每日產生：
+
+1. **數據收集（外資動向）**：抓取證交所 `TWT38U` 與櫃買中心「外資及陸資買賣超彙總表」，存入 SQLite，回補最近 10 個交易日，篩選出：
+   - **連續買超**：至今連續 3 天以上買超（`STREAK_MIN_DAYS`）。
+   - **單日大買／大賣**：依「買賣超股數 × 最新收盤價」排序，金額 ≥ 5 億元（`BIG_TRADE_VALUE`）標示為大買／大賣。
+2. **消息面分析（財經新聞）**：抓取鉅亨網（API）、經濟日報與工商時報（RSS）的當日新聞，只保存標題、連結與 200 字摘要（不轉存全文），抓取前會先檢查 robots.txt。判斷每則新聞是「利多」「利空」或「中性」，並擷取利多／利空關鍵字和相關個股：
+   - **關鍵字詞典（預設）**：不需金鑰，處理「不看好」之類的否定詞，以及「世界」這類和常用詞同名的股票。
+   - **Claude AI（選用）**：在 GitHub 儲存庫 **Settings → Secrets and variables → Actions** 新增 `ANTHROPIC_API_KEY` 後自動改用 Claude（預設模型 `claude-opus-5-5`，可用 `ANTHROPIC_MODEL` 更換），以結構化輸出取得情緒、分數、關鍵字、個股與理由；不存在的股票代號會被剔除。呼叫失敗或被拒答時改用關鍵字詞典，流程不中斷。會產生 API 費用。
+
+自動執行：GitHub Actions「外資動向與新聞情緒」在台灣時間週一至週五 17:47 完整更新，每天 08:17 只更新新聞，結果寫入 `data/foreign.json`、`data/news.json`。
+
+### 本機執行
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python -m analysis.pipeline            # 抓取、存入 data/market.db、分析並匯出 JSON
+uvicorn analysis.api:app --reload      # FastAPI：http://127.0.0.1:8000/docs
+streamlit run dashboard/app.py         # Streamlit 儀表板
+python -m pytest analysis/tests        # Python 測試
+```
+
+API：`GET /api/foreign`（連續買超、大買、大賣，可帶 `min_days`、`big_value`、`top_n`）、`GET /api/foreign/{代號}`、`GET /api/news?sentiment=利多&stock=2330`、`GET /api/news/stocks`、`POST /api/refresh`（背景重新抓取，僅供本機，未加驗證）。
+
+> 外資資料與新聞版權屬各來源網站；情緒為程式自動判斷，可能誤判，僅供參考，不構成投資建議。
+
 ## 目錄結構
 
 - `index.html`、`style.css`：頁面與樣式
 - `src/dca.js`：定期不定額試算核心（純函式，瀏覽器與測試共用）
 - `src/yahoo.js`：解析 Yahoo Finance chart API
 - `src/taifex.js`：解析期交所期貨每日行情 CSV（台指期夜盤）
+- `src/intel.js`：網站的外資動向、新聞情緒區塊
+- `analysis/`：Python 爬蟲（`crawlers/`）、SQLite（`db.py`）、外資篩選（`foreign_analysis.py`）、情緒分析（`sentiment.py`）、每日流程（`pipeline.py`）、FastAPI（`api.py`）與測試（`tests/`）
+- `dashboard/app.py`：Streamlit 儀表板
 - `src/chart.js`：SVG 走勢圖
 - `src/app.js`：表單、讀取資料與畫面更新
 - `scripts/fetch-prices.mjs`：下載股價並產生 `data/prices.json`
