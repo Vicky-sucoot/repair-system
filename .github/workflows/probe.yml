@@ -1,0 +1,54 @@
+name: probe allowed sources
+on:
+  push:
+    branches: ['claude/**']
+    paths: ['.github/workflows/probe.yml']
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          python3 - <<'PY'
+          import urllib.request, urllib.robotparser, json
+          UA = 'Mozilla/5.0 (compatible; tw-market-intel/1.0)'
+          def get(url, data=None):
+              try:
+                  r = urllib.request.urlopen(urllib.request.Request(url, data=data, headers={'User-Agent': UA}), timeout=30)
+                  return r.status, r.read().decode('utf-8', 'replace')
+              except Exception as e:
+                  return 'ERR', str(e)
+          checks = {
+            'www.twse.com.tw': ['/rwd/zh/afterTrading/STOCK_DAY', '/rwd/zh/exRight/TWT49U', '/rwd/zh/TAIEX/MI_5MINS_HIST', '/rwd/zh/afterTrading/FMTQIK'],
+            'openapi.twse.com.tw': ['/v1/exchangeReport/STOCK_DAY_ALL'],
+            'www.tpex.org.tw': ['/www/zh-tw/afterTrading/otc', '/openapi/v1/tpex_mainboard_quotes'],
+            'www.taifex.com.tw': ['/cht/3/futDataDown', '/cht/3/futDailyMarketReport'],
+            'fred.stlouisfed.org': ['/graph/fredgraph.csv'],
+            'rate.bot.com.tw': ['/xrt/flcsv/0/2026-11-17', '/xrt/quote/l6m/USD'],
+            'api.nasdaq.com': ['/api/quote/VOO/historical'],
+            'www.nasdaq.com': ['/market-activity/etf/voo/historical'],
+            'investor.vanguard.com': ['/investment-products/etfs/profile/voo'],
+            'www.alphavantage.co': ['/query'],
+          }
+          for host, paths in checks.items():
+              st, txt = get(f'https://{host}/robots.txt')
+              rp = urllib.robotparser.RobotFileParser()
+              ok_txt = st == 200 and '<html' not in txt.lower()[:300]
+              if ok_txt: rp.parse(txt.splitlines())
+              res = {p: (rp.can_fetch(UA, f'https://{host}{p}') if ok_txt else 'no robots.txt') for p in paths}
+              print('==', host, st, res)
+              if ok_txt: print('   ', ' | '.join(l for l in txt.splitlines()[:12] if l.strip()))
+          for url in ['https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=20250601&stockNo=0050&response=json',
+                      'https://www.twse.com.tw/rwd/zh/exRight/TWT49U?startDate=20240101&endDate=20261117&response=json',
+                      'https://www.twse.com.tw/rwd/zh/TAIEX/MI_5MINS_HIST?date=20261101&response=json',
+                      'https://fred.stlouisfed.org/graph/fredgraph.csv?id=DEXTAUS',
+                      'https://rate.bot.com.tw/xrt/flcsv/0/2026-11-14',
+                      'https://api.nasdaq.com/api/quote/VOO/historical?assetclass=etf&fromdate=2026-11-01&limit=5']:
+              st, txt = get(url)
+              print('=====', url, st)
+              if url.endswith('csv?id=DEXTAUS'):
+                  lines = txt.splitlines(); print(lines[:3], '...', lines[-3:], len(lines))
+              elif 'TWT49U' in url and st == 200:
+                  d = json.loads(txt); print(d.get('fields')); print([r for r in d.get('data', []) if r[1].strip() == '0050'])
+              else:
+                  print(txt[:700])
+          PY
