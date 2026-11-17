@@ -11,8 +11,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from . import db
-from .config import DB_PATH, EXPORT_DIR, HISTORY_DAYS, NEWS_KEEP_DAYS
-from .crawlers import foreign, global_quotes, news, stocks
+from .config import DB_PATH, EXPORT_DIR, HISTORY_DAYS, NEWS_KEEP_DAYS, TRUST_BIG_TRADE_VALUE
+from .crawlers import foreign, global_quotes, news, stocks, trust
 from .crawlers.news import TW
 from .foreign_analysis import analyze, stock_flows
 from . import recommend
@@ -45,6 +45,13 @@ def collect_foreign(conn, days: int, today: date | None = None) -> list[str]:
                         db.upsert_foreign(conn, foreign.fetch_tpex(day))
                     except Exception as error:
                         print(f"櫃買中心 {iso} 下載失敗：{error}")
+                # 投信買賣超（同一交易日）
+                for market, fetcher in (("TWSE", trust.fetch_twse), ("TPEx", trust.fetch_tpex)):
+                    if not db.has_foreign(conn, iso, market, table="trust_trades"):
+                        try:
+                            db.upsert_foreign(conn, fetcher(day), table="trust_trades")
+                        except Exception as error:
+                            print(f"投信 {market} {iso} 下載失敗：{error}")
         day -= timedelta(days=1)
     return sorted(found)
 
@@ -141,6 +148,14 @@ def run(days: int = HISTORY_DAYS, *, skip_foreign: bool = False, skip_news: bool
             foreign_result = analyze(rows, prices)
             _, flows = stock_flows(rows, prices)
             report["foreign_date"] = foreign_result["date"]
+            # 投信動向：與外資相同的篩選方式，門檻較低
+            trust_rows = [r for r in db.foreign_rows(conn, since=dates[0], table="trust_trades") if r["date"] in set(dates)]
+            if trust_rows:
+                trust_result = analyze(trust_rows, prices, big_value=TRUST_BIG_TRADE_VALUE)
+                export_json(export_dir / "trust.json", {"updatedAt": now_tw().isoformat(timespec="seconds"),
+                                                        "source": "臺灣證券交易所、證券櫃檯買賣中心（投信買賣超彙總表）",
+                                                        **trust_result})
+                report["trust_date"] = trust_result["date"]
         else:
             report["errors"].append("沒有取得任何外資買賣超資料")
 

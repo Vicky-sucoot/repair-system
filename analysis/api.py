@@ -11,7 +11,7 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 
 from . import db, pipeline
 from .crawlers.news import dedupe_ticks
-from .config import BIG_TRADE_VALUE, DB_PATH, NEWS_KEEP_DAYS, STREAK_MIN_DAYS, TOP_N
+from .config import BIG_TRADE_VALUE, DB_PATH, NEWS_KEEP_DAYS, STREAK_MIN_DAYS, TOP_N, TRUST_BIG_TRADE_VALUE
 from .foreign_analysis import analyze, stock_flows
 from . import recommend
 
@@ -39,6 +39,19 @@ def foreign_summary(min_days: int = Query(STREAK_MIN_DAYS, ge=1, le=30),
     conn = _conn()
     dates = db.foreign_dates(conn)[-30:]
     rows = db.foreign_rows(conn, since=dates[0]) if dates else []
+    prices = {code: s["close"] for code, s in db.stock_map(conn).items()}
+    conn.close()
+    return analyze(rows, prices, min_days=min_days, big_value=big_value, top_n=top_n)
+
+
+@app.get("/api/trust")
+def trust_summary(min_days: int = Query(STREAK_MIN_DAYS, ge=1, le=30),
+                  big_value: float = Query(TRUST_BIG_TRADE_VALUE, ge=0),
+                  top_n: int = Query(TOP_N, ge=1, le=200)) -> dict:
+    """最新交易日的投信連續買超、單日大買與大賣。"""
+    conn = _conn()
+    dates = db.foreign_dates(conn, table="trust_trades")[-30:]
+    rows = db.foreign_rows(conn, since=dates[0], table="trust_trades") if dates else []
     prices = {code: s["close"] for code, s in db.stock_map(conn).items()}
     conn.close()
     return analyze(rows, prices, min_days=min_days, big_value=big_value, top_n=top_n)

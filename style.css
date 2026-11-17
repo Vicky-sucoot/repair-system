@@ -108,6 +108,11 @@ button:disabled { cursor: not-allowed; }
 #news-counts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 /* 頁面導覽與今日觀察名單 */
+/* 新增、刪除投資項目 */
+.item-form { margin-top: 12px; }
+.plan-delete { margin-top: 16px; text-align: right; }
+.plan-custom-note { margin: 0 0 8px; }
+
 /* 自選清單 */
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .mylist-form { display: flex; gap: 8px; margin-top: 12px; }
