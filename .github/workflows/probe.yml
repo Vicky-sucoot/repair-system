@@ -1,4 +1,4 @@
-name: probe global quotes
+name: probe global quotes 2
 on:
   push:
     branches: ['claude/**']
@@ -15,25 +15,26 @@ jobs:
           python - <<'PY'
           import io, json, requests, pandas as pd
           UA = {'User-Agent': 'Mozilla/5.0 (compatible; tw-market-intel/1.0)'}
-          for name, url in [('sp500', 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'),
-                            ('ndx', 'https://en.wikipedia.org/wiki/Nasdaq-100'),
-                            ('n225', 'https://en.wikipedia.org/wiki/Nikkei_225')]:
-              try:
-                  html = requests.get(url, headers=UA, timeout=30).text
-                  tables = pd.read_html(io.StringIO(html))
-                  print('==', name, 'tables', len(tables))
-                  for i, t in enumerate(tables[:8]):
-                      print('  ', i, t.shape, list(t.columns)[:6])
-                      if len(t) > 50: print('     head', t.head(2).values.tolist())
-              except Exception as e:
-                  print('ERR', name, e)
-          syms = 'AAPL,MSFT,NVDA,VOO,QQQ,7203.T,6758.T,1321.T,^N225,^GSPC'
-          for url in [f'https://query1.finance.yahoo.com/v7/finance/spark?symbols={syms}&range=5d&interval=1d',
-                      f'https://query1.finance.yahoo.com/v8/finance/spark?symbols={syms}&range=5d&interval=1d',
-                      f'https://query1.finance.yahoo.com/v7/finance/quote?symbols={syms}']:
+          html = requests.get('https://en.wikipedia.org/wiki/Nasdaq-100', headers=UA, timeout=30).text
+          for i, t in enumerate(pd.read_html(io.StringIO(html))):
+              if any('Ticker' in str(c) or 'Symbol' in str(c) for c in t.columns):
+                  print('ndx table', i, t.shape, list(t.columns), t.head(2).values.tolist())
+          for url in ['https://indexes.nikkei.co.jp/en/nkave/index/component?idx=nk225',
+                      'https://indexes.nikkei.co.jp/nkave/index/component?idx=nk225']:
               r = requests.get(url, headers=UA, timeout=30)
-              print('==', url[:70], r.status_code, r.text[:700])
-          r = requests.get('https://query1.finance.yahoo.com/v8/finance/chart/7203.T?range=5d&interval=1d', headers=UA, timeout=30)
-          m = r.json()['chart']['result'][0]['meta']
-          print('chart meta', {k: m.get(k) for k in ('symbol', 'currency', 'regularMarketPrice', 'chartPreviousClose', 'previousClose', 'longName', 'shortName', 'regularMarketTime', 'exchangeTimezoneName')})
+              print('== nikkei', url, r.status_code, len(r.text))
+              try:
+                  ts = pd.read_html(io.StringIO(r.text))
+                  tot = sum(len(t) for t in ts)
+                  print('  tables', len(ts), 'rows', tot, [ (t.shape, list(t.columns)[:3]) for t in ts[:3]], ts[0].head(3).values.tolist())
+              except Exception as e:
+                  print('  ERR', e, r.text[:300])
+          syms = ['AAPL','MSFT','NVDA','AMZN','GOOGL','META','TSLA','AVGO','BRK-B','JPM','VOO','QQQ','SPY','VTI','SMH','7203.T','6758.T','8035.T','9984.T','1321.T']
+          r = requests.get('https://query1.finance.yahoo.com/v7/finance/spark', params={'symbols': ','.join(syms), 'range': '5d', 'interval': '1d'}, headers=UA, timeout=30)
+          res = r.json()['spark']['result']
+          print('spark n', len(res), r.status_code)
+          for x in res[:20]:
+              resp = x['response'][0]; m = resp['meta']
+              closes = resp['indicators']['quote'][0]['close']; ts = resp['timestamp']
+              print(x['symbol'], m.get('currency'), m.get('shortName'), '|', m.get('longName'), m.get('regularMarketPrice'), closes[-2:], ts[-1], m.get('exchangeTimezoneName'))
           PY
