@@ -6,15 +6,45 @@ from collections import defaultdict
 from .config import BIG_TRADE_VALUE, STREAK_MIN_DAYS, TOP_N
 
 
-def streak_length(nets: list[int]) -> int:
-    """由最近一天往回數，連續買超（>0）幾天；最近一天不是買超則為 0。"""
+def streak_length(nets: list[int], sign: int = 1) -> int:
+    """由最近一天往回數，連續買超（sign=1，>0）或連續賣超（sign=-1，<0）幾天。"""
     count = 0
     for net in reversed(nets):
-        if net > 0:
+        if net * sign > 0:
             count += 1
         else:
             break
     return count
+
+
+def stock_flows(rows: list[dict], prices: dict[str, float | None] | None = None) -> tuple[list[str], list[dict]]:
+    """最新交易日每檔股票的外資買賣超、金額與連續買／賣超天數。回傳 (日期清單, 個股清單)。"""
+    prices = prices or {}
+    if not rows:
+        return [], []
+    dates = sorted({r["date"] for r in rows})
+    latest = dates[-1]
+    by_stock: dict[tuple[str, str], dict[str, dict]] = defaultdict(dict)
+    for r in rows:
+        by_stock[(r["market"], r["code"])][r["date"]] = r
+    flows = []
+    for history in by_stock.values():
+        if latest not in history:
+            continue
+        r = history[latest]
+        nets = [history[d]["net"] if d in history else 0 for d in dates]
+        streak = streak_length(nets)
+        price = prices.get(r["code"])
+        value = r["net"] * price if price else None
+        flows.append({
+            "code": r["code"], "name": r["name"], "market": r["market"],
+            "net_shares": r["net"], "net_lots": round(r["net"] / 1000),
+            "price": price, "net_value": round(value) if value is not None else None,
+            "streak_days": streak,
+            "streak_shares": sum(nets[len(nets) - streak:]) if streak else 0,
+            "sell_streak_days": streak_length(nets, -1),
+        })
+    return dates, flows
 
 
 def analyze(rows: list[dict], prices: dict[str, float | None] | None = None, *,
@@ -23,29 +53,10 @@ def analyze(rows: list[dict], prices: dict[str, float | None] | None = None, *,
     rows：多個交易日的外資買賣超（date, market, code, name, net…）。
     prices：最新收盤價，用來把股數換算成金額（新台幣）；沒有價格時金額為 None。
     """
-    prices = prices or {}
-    if not rows:
+    dates, today = stock_flows(rows, prices)
+    if not dates:
         return {"date": None, "dates": [], "streaks": [], "big_buys": [], "big_sells": []}
-    dates = sorted({r["date"] for r in rows})
     latest = dates[-1]
-    by_stock: dict[tuple[str, str], dict[str, dict]] = defaultdict(dict)
-    for r in rows:
-        by_stock[(r["market"], r["code"])][r["date"]] = r
-
-    def enrich(r: dict, history: dict[str, dict]) -> dict:
-        nets = [history[d]["net"] if d in history else 0 for d in dates]
-        streak = streak_length(nets)
-        price = prices.get(r["code"])
-        value = r["net"] * price if price else None
-        return {
-            "code": r["code"], "name": r["name"], "market": r["market"],
-            "net_shares": r["net"], "net_lots": round(r["net"] / 1000),
-            "price": price, "net_value": round(value) if value is not None else None,
-            "streak_days": streak,
-            "streak_shares": sum(nets[len(nets) - streak:]) if streak else 0,
-        }
-
-    today = [enrich(h[latest], h) for h in by_stock.values() if latest in h]
     streaks = sorted((s for s in today if s["streak_days"] >= min_days),
                      key=lambda s: (s["streak_days"], s["net_value"] or s["net_shares"]), reverse=True)
 

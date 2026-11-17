@@ -4,7 +4,7 @@ on:
   schedule:
     # 台灣時間週一至週五 17:47：證交所、櫃買中心公布外資買賣超後（含新聞）
     - cron: '47 9 * * 1-5'
-    # 台灣時間每天 08:17：只更新新聞
+    # 台灣時間每天 08:17：以最新新聞與前一交易日外資資料更新觀察名單
     - cron: '17 0 * * *'
   workflow_dispatch:
   push:
@@ -36,20 +36,15 @@ jobs:
         env:
           # 選用：在 Settings → Secrets 設定 ANTHROPIC_API_KEY 後改用 Claude 分析新聞情緒
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          if [ "${{ github.event.schedule }}" = "17 0 * * *" ]; then
-            python -m analysis.pipeline --skip-foreign
-          else
-            python -m analysis.pipeline
-          fi
+        run: python -m analysis.pipeline
       - name: 提交更新的資料
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898333+github-actions[bot]@users.noreply.github.com"
-          git add data/foreign.json data/news.json
+          git add data/foreign.json data/news.json data/recommend.json
           if git diff --cached --quiet; then
             echo "資料沒有變化"; exit 0
           fi
-          git commit -m "Update foreign investor and news data"
+          git commit -m "Update foreign investor, news and watchlist data"
           for i in 1 2 3; do git pull --rebase origin main && git push && exit 0; sleep 5; done
           exit 1

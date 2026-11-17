@@ -41,9 +41,17 @@
    - **關鍵字詞典（備援）**：沒有金鑰、呼叫失敗或被拒答時自動使用，會處理「不看好」之類的否定詞，以及「世界」這類和常用詞同名的股票。
 3. **外資動向 Claude 解讀**：Claude 綜合外資連續買超、單日大買／大賣與新聞情緒，產生今日摘要、最多 8 檔重點個股（偏多／偏空／觀察及理由）、題材與風險，顯示在網站「外資動向」區塊上方。只使用當日資料，不預測股價、不提供買賣建議；個股代號必須出現在當日資料中。
 
+4. **綜合評分與建議（今日觀察名單）**：`analysis/recommend.py` 結合外資買賣超與新聞情緒，產生 `data/recommend.json`，顯示在網站最上方「今日觀察名單」：
+   - **外資分數 F**（-1～1）＝方向 ×（0.6 × 金額強度 + 0.4 × 連續強度）。金額強度＝√min(1, |買賣超金額| ÷ 20 億元)，5 億元約 0.5；連續強度＝min(連續買／賣超天數, 5) ÷ 5。
+   - **新聞分數 N**（-1～1）＝近 3 天提及該股新聞的加權平均情緒（利多 +、利空 −；當天權重 1、前一天 0.6、前兩天 0.36），乘上可信度 min(1, 權重總和 ÷ 1.5)，只有一則新聞時打折。
+   - **綜合分數**＝100 ×（0.55 × F + 0.45 × N）。
+   - **建議買入**＝外資買超且新聞偏多（F > 0 且 N > 0），依綜合分數由高到低取前 10 檔；**建議賣出／避開**＝外資賣超且新聞偏空，由低到高取前 10 檔。外資與新聞方向相反的個股視為訊號分歧，不列入；只列個股（排除 0 開頭的 ETF／ETN），大盤指數快訊不算個股新聞，同一標題只算一次。
+   - 每檔附推薦理由：預設以固定格式列出外資買賣超、連續天數與利多／利空關鍵字；設定 Claude 金鑰後由 Claude 撰寫 40～80 字理由（只使用當日資料、不預測價格）。
+   - 觀察名單是籌碼面與消息面的篩選結果，**不是買賣建議，也不保證報酬**；外資資料為前一交易日收盤後數據，新聞情緒可能誤判。
+
 **啟用 Claude**：到 GitHub 儲存庫 **Settings → Secrets and variables → Actions → New repository secret**，名稱填 `ANTHROPIC_API_KEY`，值填 Anthropic API 金鑰。下一次排程（或在 Actions 頁面手動執行「外資動向與新聞情緒」）就會改用 Claude。每天約 2 次新聞分析加 1 次外資解讀，會產生 API 費用；沒有設定金鑰時，網站照常以關鍵字分析運作，只是不顯示 Claude 解讀。
 
-自動執行：GitHub Actions「外資動向與新聞情緒」在台灣時間週一至週五 17:47 完整更新，每天 08:17 只更新新聞，結果寫入 `data/foreign.json`、`data/news.json`。
+自動執行：GitHub Actions「外資動向與新聞情緒」在台灣時間每天 08:17（以最新新聞搭配前一交易日外資資料）與週一至週五 17:47（當日外資資料公布後）執行，結果寫入 `data/foreign.json`、`data/news.json`、`data/recommend.json`。
 
 ### 本機執行
 
@@ -56,7 +64,7 @@ streamlit run dashboard/app.py         # Streamlit 儀表板
 python -m pytest analysis/tests        # Python 測試
 ```
 
-API：`GET /api/foreign`（連續買超、大買、大賣，可帶 `min_days`、`big_value`、`top_n`）、`GET /api/foreign/{代號}`、`GET /api/news?sentiment=利多&stock=2330`、`GET /api/news/stocks`、`POST /api/refresh`（背景重新抓取，僅供本機，未加驗證）。
+API：`GET /api/recommendations`（今日觀察名單，可帶 `top_n`、`big_value`）、`GET /api/foreign`（連續買超、大買、大賣，可帶 `min_days`、`big_value`、`top_n`）、`GET /api/foreign/{代號}`、`GET /api/news?sentiment=利多&stock=2330`、`GET /api/news/stocks`、`POST /api/refresh`（背景重新抓取，僅供本機，未加驗證）。
 
 > 外資資料與新聞版權屬各來源網站；情緒為程式自動判斷，可能誤判，僅供參考，不構成投資建議。
 
@@ -67,7 +75,7 @@ API：`GET /api/foreign`（連續買超、大買、大賣，可帶 `min_days`、
 - `src/yahoo.js`：解析 Yahoo Finance chart API
 - `src/taifex.js`：解析期交所期貨每日行情 CSV（台指期夜盤）
 - `src/intel.js`：網站的外資動向、新聞情緒區塊
-- `analysis/`：Python 爬蟲（`crawlers/`）、SQLite（`db.py`）、外資篩選（`foreign_analysis.py`）、情緒分析（`sentiment.py`）、Claude 外資解讀（`insight.py`）、每日流程（`pipeline.py`）、FastAPI（`api.py`）與測試（`tests/`）
+- `analysis/`：Python 爬蟲（`crawlers/`）、SQLite（`db.py`）、外資篩選（`foreign_analysis.py`）、情緒分析（`sentiment.py`）、Claude 外資解讀（`insight.py`）、綜合評分（`recommend.py`）、每日流程（`pipeline.py`）、FastAPI（`api.py`）與測試（`tests/`）
 - `dashboard/app.py`：Streamlit 儀表板
 - `src/chart.js`：SVG 走勢圖
 - `src/app.js`：表單、讀取資料與畫面更新

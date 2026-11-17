@@ -14,7 +14,8 @@ from . import db
 from .config import DB_PATH, EXPORT_DIR, HISTORY_DAYS, NEWS_KEEP_DAYS
 from .crawlers import foreign, news, stocks
 from .crawlers.news import TW
-from .foreign_analysis import analyze
+from .foreign_analysis import analyze, stock_flows
+from . import recommend
 from .insight import generate as generate_insight
 from .sentiment import analyze_items, llm_available
 
@@ -98,11 +99,12 @@ def run(days: int = HISTORY_DAYS, *, skip_foreign: bool = False, skip_news: bool
             rows = [r for r in db.foreign_rows(conn, since=dates[0]) if r["date"] in set(dates)]
             prices = {code: s["close"] for code, s in smap.items()}
             foreign_result = analyze(rows, prices)
+            _, flows = stock_flows(rows, prices)
             report["foreign_date"] = foreign_result["date"]
         else:
             report["errors"].append("沒有取得任何外資買賣超資料")
 
-    news_stocks, news_counts = [], {}
+    news_stocks, news_counts, analyzed = [], {}, None
 
     if not skip_news:
         news_path = export_dir / "news.json"
@@ -145,6 +147,12 @@ def run(days: int = HISTORY_DAYS, *, skip_foreign: bool = False, skip_news: bool
                                                   "source": "臺灣證券交易所、證券櫃檯買賣中心",
                                                   **foreign_result, "insight": insight})
         report["insight"] = bool(insight)
+        if analyzed is not None:
+            # 綜合評分：外資買＋新聞利多 → 建議買入；外資賣＋新聞利空 → 建議賣出／避開
+            rec = recommend.claude_reasons(recommend.build(flows, analyzed, now_tw().date()))
+            export_json(export_dir / "recommend.json", {"updatedAt": now_tw().isoformat(timespec="seconds"),
+                                                        "date": foreign_result["date"], **rec})
+            report["recommend"] = {"buy": len(rec["buy"]), "sell": len(rec["sell"])}
     conn.close()
     return report
 

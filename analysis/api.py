@@ -12,7 +12,8 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from . import db, pipeline
 from .crawlers.news import dedupe_ticks
 from .config import BIG_TRADE_VALUE, DB_PATH, NEWS_KEEP_DAYS, STREAK_MIN_DAYS, TOP_N
-from .foreign_analysis import analyze
+from .foreign_analysis import analyze, stock_flows
+from . import recommend
 
 app = FastAPI(title="台股外資動向與新聞情緒 API", version="1.0.0")
 
@@ -78,6 +79,21 @@ def news_stocks(days: int = Query(NEWS_KEEP_DAYS, ge=1, le=30)) -> list[dict]:
     items = dedupe_ticks(db.news_items(conn, since=since, analyzed=True))
     conn.close()
     return pipeline.stock_summary(items)
+
+
+@app.get("/api/recommendations")
+def recommendations(top_n: int = Query(10, ge=1, le=50), big_value: float = Query(BIG_TRADE_VALUE, ge=0)) -> dict:
+    """今日觀察名單：建議買入（外資買＋新聞利多）與建議賣出／避開（外資賣＋新聞利空），附評分與理由。"""
+    conn = _conn()
+    dates = db.foreign_dates(conn)[-30:]
+    rows = db.foreign_rows(conn, since=dates[0]) if dates else []
+    prices = {code: s["close"] for code, s in db.stock_map(conn).items()}
+    since = (pipeline.now_tw() - timedelta(days=NEWS_KEEP_DAYS)).isoformat(timespec="seconds")
+    items = dedupe_ticks(db.news_items(conn, since=since, analyzed=True))
+    conn.close()
+    _, flows = stock_flows(rows, prices)
+    result = recommend.build(flows, items, pipeline.now_tw().date(), top_n=top_n, big_value=big_value)
+    return {"date": dates[-1] if dates else None, **result}
 
 
 @app.post("/api/refresh", status_code=202)
