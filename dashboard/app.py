@@ -87,6 +87,23 @@ with foreign_tab:
         cols[1].metric("賣超家數", c.get("sell", 0))
         cols[2].metric(f"連續買超 ≥{data.get('streak_min_days', min_days)} 天", c.get("streaks", 0))
         cols[3].metric("單日大買／大賣", f"{c.get('big_buy', 0)} / {c.get('big_sell', 0)}")
+        insight = data.get("insight")
+        if not insight:  # SQLite 沒有存解讀，改讀每日流程匯出的 JSON（同一天才採用）
+            path = EXPORT_DIR / "foreign.json"
+            saved = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+            insight = saved.get("insight") if saved.get("date") == data["date"] else None
+        if insight:
+            with st.container(border=True):
+                st.markdown(f"**Claude 解讀**（{insight.get('model', 'Claude')}，AI 產生，僅供參考）")
+                st.write(insight["summary"])
+                for h in insight.get("highlights", []):
+                    st.write(f"{h['view']}｜{h['name']}（{h['code']}）：{h['reason']}")
+                if insight.get("themes"):
+                    st.caption("題材：" + "、".join(insight["themes"]))
+                if insight.get("risks"):
+                    st.caption("風險：" + "、".join(insight["risks"]))
+        else:
+            st.caption("設定 ANTHROPIC_API_KEY 後，每日流程會產生 Claude 解讀。")
         st.markdown("#### 連續買超")
         st.dataframe(stock_table(data["streaks"]), hide_index=True, use_container_width=True)
         left, right = st.columns(2)

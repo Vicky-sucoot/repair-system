@@ -64,6 +64,38 @@ function renderForeign() {
   table.replaceChildren(thead, tbody);
 }
 
+// Claude 對外資動向的解讀（需設定 API 金鑰；沒有時不顯示）
+function renderInsight() {
+  const box = $('#foreign-insight');
+  const insight = foreignData?.insight;
+  if (!insight?.summary) { box.hidden = true; box.replaceChildren(); return; }
+  const head = el('p', '', 'insight-head');
+  head.append(el('strong', 'Claude 解讀'), el('span', `・${insight.model || 'Claude'}・AI 產生，僅供參考`, 'hint'));
+  const parts = [head, el('p', insight.summary, 'insight-summary')];
+  if (insight.highlights?.length) {
+    const list = el('ul', '', 'insight-list');
+    for (const h of insight.highlights) {
+      const li = el('li');
+      li.append(el('span', h.view, `badge-sentiment ${h.view === '偏多' ? 'up' : h.view === '偏空' ? 'down' : ''}`), ' ',
+        el('strong', `${h.name} ${h.code}`), el('span', `：${h.reason}`));
+      list.append(li);
+    }
+    parts.push(list);
+  }
+  const tags = [...(insight.themes || []).map(t => ['題材', t]), ...(insight.risks || []).map(r => ['風險', r])];
+  if (tags.length) {
+    const chips = el('ul', '', 'chips');
+    tags.forEach(([kind, text]) => {
+      const li = el('li', '', 'chip');
+      li.append(el('strong', `${kind} `), text);
+      chips.append(li);
+    });
+    parts.push(chips);
+  }
+  box.replaceChildren(...parts);
+  box.hidden = false;
+}
+
 // ---------- 新聞情緒 ----------
 function sentimentClass(s) { return s === '利多' ? 'up' : s === '利空' ? 'down' : 'neutral'; }
 
@@ -127,6 +159,7 @@ async function loadIntel() {
     newsStatus.className = 'error';
     newsStatus.textContent = `無法取得新聞資料：${error.message}`;
   }
+  renderInsight();
   renderForeign();
   renderNews();
 }

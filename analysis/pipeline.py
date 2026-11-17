@@ -15,6 +15,7 @@ from .config import DB_PATH, EXPORT_DIR, HISTORY_DAYS, NEWS_KEEP_DAYS
 from .crawlers import foreign, news, stocks
 from .crawlers.news import TW
 from .foreign_analysis import analyze
+from .insight import generate as generate_insight
 from .sentiment import analyze_items, llm_available
 
 
@@ -90,17 +91,18 @@ def run(days: int = HISTORY_DAYS, *, skip_foreign: bool = False, skip_news: bool
         db.upsert_stocks(conn, stock_list)
     smap = db.stock_map(conn)
 
+    foreign_result = None
     if not skip_foreign:
         dates = collect_foreign(conn, days)
         if dates:
             rows = [r for r in db.foreign_rows(conn, since=dates[0]) if r["date"] in set(dates)]
             prices = {code: s["close"] for code, s in smap.items()}
-            result = analyze(rows, prices)
-            export_json(export_dir / "foreign.json", {"updatedAt": now_tw().isoformat(timespec="seconds"),
-                                                      "source": "臺灣證券交易所、證券櫃檯買賣中心", **result})
-            report["foreign_date"] = result["date"]
+            foreign_result = analyze(rows, prices)
+            report["foreign_date"] = foreign_result["date"]
         else:
             report["errors"].append("沒有取得任何外資買賣超資料")
+
+    news_stocks, news_counts = [], {}
 
     if not skip_news:
         news_path = export_dir / "news.json"
@@ -111,6 +113,9 @@ def run(days: int = HISTORY_DAYS, *, skip_foreign: bool = False, skip_news: bool
         cutoff = (now_tw() - timedelta(days=NEWS_KEEP_DAYS)).isoformat(timespec="seconds")
         db.delete_news_before(conn, cutoff)
         pending = db.news_items(conn, analyzed=False)
+        if llm_available():
+            # 改用 Claude 後，先前以關鍵字分析的新聞也重新分析
+            pending += [i for i in db.news_items(conn, since=cutoff, analyzed=True) if i.get("analyzer") == "lexicon"]
         # 名稱比對用：股票清單＋外資表中出現過的名稱
         names = dict(smap)
         for r in db.foreign_rows(conn):
@@ -120,10 +125,11 @@ def run(days: int = HISTORY_DAYS, *, skip_foreign: bool = False, skip_news: bool
         analyzed = news.dedupe_ticks(db.news_items(conn, since=cutoff, analyzed=True))
         analyzed.sort(key=lambda i: i.get("published_at") or "", reverse=True)
         counts = {k: sum(1 for i in analyzed if i["sentiment"] == k) for k in ("利多", "利空", "中性")}
+        news_stocks, news_counts = stock_summary(analyzed), counts
         export_json(news_path, {
             "updatedAt": now_tw().isoformat(timespec="seconds"),
             "sources": [s["name"] for s in news.SOURCES.values()],
-            "analyzer": "llm" if llm_available() else "lexicon",
+            "analyzer": "llm" if any(str(i.get("analyzer", "")).startswith("llm") for i in analyzed) else "lexicon",
             "counts": counts, "stocks": stock_summary(analyzed)[:30],
             "items": [{k: i[k] for k in ("id", "source", "title", "url", "summary", "published_at", "tags", "sentiment",
                                          "score", "bullish_keywords", "bearish_keywords", "stocks", "reason", "analyzer")}
@@ -131,6 +137,14 @@ def run(days: int = HISTORY_DAYS, *, skip_foreign: bool = False, skip_news: bool
         })
         report["news"] = len(analyzed)
         report["news_new"] = len(pending)
+
+    if foreign_result:
+        # 外資動向最後寫出，讓 Claude 解讀能同時參考新聞情緒
+        insight = generate_insight(foreign_result, news_stocks, news_counts)
+        export_json(export_dir / "foreign.json", {"updatedAt": now_tw().isoformat(timespec="seconds"),
+                                                  "source": "臺灣證券交易所、證券櫃檯買賣中心",
+                                                  **foreign_result, "insight": insight})
+        report["insight"] = bool(insight)
     conn.close()
     return report
 

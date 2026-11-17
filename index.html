@@ -36,6 +36,7 @@
       <div class="section-heading">
         <div><h2 id="foreign-title">外資動向</h2><p id="foreign-status" class="hint" role="status">讀取中…</p></div>
       </div>
+      <div id="foreign-insight" class="insight" hidden></div>
       <div class="segmented" role="group" aria-label="外資篩選">
         <button type="button" data-foreign="streaks" aria-pressed="true">連續買超</button>
         <button type="button" data-foreign="big_buys" aria-pressed="false">單日大買</button>
@@ -88,7 +89,7 @@
         <li>台股預設整股（零股）買進，未用完的金額不扣款；手續費＝成交金額 × 費率，不足最低手續費以最低計。</li>
         <li>VOO 以投入當日美元匯率換算新台幣，預設可買碎股、股息預扣 30% 稅；市值以最新匯率換算。</li>
         <li>配息依除息日持股計算；勾選「股息再投入」會於除息日買進，否則列為已領現金，並計入總報酬。</li>
-        <li>外資動向來自臺灣證券交易所與證券櫃檯買賣中心「外資及陸資買賣超彙總表」，金額以最新收盤價估算；財經新聞來自鉅亨網、經濟日報、工商時報，只顯示標題與摘要，情緒為程式自動判斷，可能有誤。</li>
+        <li>外資動向來自臺灣證券交易所與證券櫃檯買賣中心「外資及陸資買賣超彙總表」，金額以最新收盤價估算；財經新聞來自鉅亨網、經濟日報、工商時報，只顯示標題與摘要。新聞情緒與外資解讀由 Claude AI 分析（未設定金鑰時改用關鍵字詞典），可能有誤，僅供參考，不構成投資建議。</li>
         <li>股價、配息與加權指數來自 Yahoo Finance，台指期夜盤（近月、盤後交易時段）來自臺灣期貨交易所；每個交易日由 GitHub Actions 自動更新兩次（台灣時間 07:17 與 14:17），點選行情卡片可開啟來源網站看即時報價。試算結果僅供參考，不構成投資建議，實際成交以券商對帳單為準。</li>
       </ul>
     </section>
