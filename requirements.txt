@@ -6,5 +6,6 @@ pydantic>=2.7
 anthropic>=2.9        # 選用：設定 ANTHROPIC_API_KEY 時以 Claude 分析新聞情緒
 streamlit>=1.40       # 儀表板：streamlit run dashboard/app.py
 pandas>=2.2
+lxml>=5.0             # 解析美股、日股成分股表格
 pytest>=8.0
 httpx>=0.27           # FastAPI TestClient

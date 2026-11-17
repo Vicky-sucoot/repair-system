@@ -1,4 +1,4 @@
-name: probe global quotes 2
+name: probe global pipeline
 on:
   push:
     branches: ['claude/**']
@@ -7,34 +7,24 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install -q pandas lxml requests
+      - run: pip install -q -r requirements.txt
+      - run: python -m pytest -q analysis/tests
       - run: |
           python - <<'PY'
-          import io, json, requests, pandas as pd
-          UA = {'User-Agent': 'Mozilla/5.0 (compatible; tw-market-intel/1.0)'}
-          html = requests.get('https://en.wikipedia.org/wiki/Nasdaq-100', headers=UA, timeout=30).text
-          for i, t in enumerate(pd.read_html(io.StringIO(html))):
-              if any('Ticker' in str(c) or 'Symbol' in str(c) for c in t.columns):
-                  print('ndx table', i, t.shape, list(t.columns), t.head(2).values.tolist())
-          for url in ['https://indexes.nikkei.co.jp/en/nkave/index/component?idx=nk225',
-                      'https://indexes.nikkei.co.jp/nkave/index/component?idx=nk225']:
-              r = requests.get(url, headers=UA, timeout=30)
-              print('== nikkei', url, r.status_code, len(r.text))
-              try:
-                  ts = pd.read_html(io.StringIO(r.text))
-                  tot = sum(len(t) for t in ts)
-                  print('  tables', len(ts), 'rows', tot, [ (t.shape, list(t.columns)[:3]) for t in ts[:3]], ts[0].head(3).values.tolist())
-              except Exception as e:
-                  print('  ERR', e, r.text[:300])
-          syms = ['AAPL','MSFT','NVDA','AMZN','GOOGL','META','TSLA','AVGO','BRK-B','JPM','VOO','QQQ','SPY','VTI','SMH','7203.T','6758.T','8035.T','9984.T','1321.T']
-          r = requests.get('https://query1.finance.yahoo.com/v7/finance/spark', params={'symbols': ','.join(syms), 'range': '5d', 'interval': '1d'}, headers=UA, timeout=30)
-          res = r.json()['spark']['result']
-          print('spark n', len(res), r.status_code)
-          for x in res[:20]:
-              resp = x['response'][0]; m = resp['meta']
-              closes = resp['indicators']['quote'][0]['close']; ts = resp['timestamp']
-              print(x['symbol'], m.get('currency'), m.get('shortName'), '|', m.get('longName'), m.get('regularMarketPrice'), closes[-2:], ts[-1], m.get('exchangeTimezoneName'))
+          import json, time
+          from analysis.crawlers import global_quotes
+          t = time.time()
+          uni = global_quotes.universe()
+          print('universe', len(uni), {m: sum(1 for u in uni if u['market'] == m) for m in ('US', 'JP')}, round(time.time() - t, 1), 's')
+          t = time.time()
+          q = global_quotes.fetch_quotes(uni)
+          print('quotes', len(q), {m: sum(1 for x in q if x['market'] == m) for m in ('US', 'JP')}, round(time.time() - t, 1), 's')
+          by = {x['code']: x for x in q}
+          for c in ('AAPL', 'NVDA', 'BRK-B', 'VOO', 'TSM', '7203.T', '6758.T', '285A.T', '1321.T', '2558.T'):
+              print(c, by.get(c))
+          print('dates', sorted({(x['market'], x['date']) for x in q}))
           PY
