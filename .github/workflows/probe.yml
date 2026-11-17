@@ -1,4 +1,4 @@
-name: probe global pipeline
+name: probe stooq
 on:
   push:
     branches: ['claude/**']
@@ -7,24 +7,24 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - run: pip install -q -r requirements.txt
-      - run: python -m pytest -q analysis/tests
       - run: |
-          python - <<'PY'
-          import json, time
-          from analysis.crawlers import global_quotes
-          t = time.time()
-          uni = global_quotes.universe()
-          print('universe', len(uni), {m: sum(1 for u in uni if u['market'] == m) for m in ('US', 'JP')}, round(time.time() - t, 1), 's')
-          t = time.time()
-          q = global_quotes.fetch_quotes(uni)
-          print('quotes', len(q), {m: sum(1 for x in q if x['market'] == m) for m in ('US', 'JP')}, round(time.time() - t, 1), 's')
-          by = {x['code']: x for x in q}
-          for c in ('AAPL', 'NVDA', 'BRK-B', 'VOO', 'TSM', '7203.T', '6758.T', '285A.T', '1321.T', '2558.T'):
-              print(c, by.get(c))
-          print('dates', sorted({(x['market'], x['date']) for x in q}))
+          python3 - <<'PY'
+          import urllib.request, urllib.robotparser
+          UA = 'Mozilla/5.0 (compatible; tw-market-intel/1.0)'
+          def get(url):
+              try:
+                  r = urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': UA}), timeout=30)
+                  return r.status, r.read().decode('utf-8', 'replace')
+              except Exception as e:
+                  return 'ERR', str(e)
+          for host in ('stooq.com', 'query1.finance.yahoo.com', 'query2.finance.yahoo.com'):
+              st, txt = get(f'https://{host}/robots.txt')
+              print('== robots', host, st); print(txt[:600])
+              rp = urllib.robotparser.RobotFileParser(); rp.parse(txt.splitlines())
+              for path in ('/q/l/', '/q/d/l/', '/v7/finance/spark', '/v8/finance/chart/VOO'):
+                  print('   can_fetch', path, rp.can_fetch(UA, f'https://{host}{path}'))
+          for url in ['https://stooq.com/q/l/?s=aapl.us+voo.us+brk-b.us+7203.jp+1321.jp&f=sd2t2ohlcpv&h&e=csv',
+                      'https://stooq.com/q/l/?s=aapl.us,voo.us,7203.jp&f=sd2t2ohlcpvn&h&e=csv',
+                      'https://stooq.com/q/d/l/?s=7203.jp&i=d']:
+              st, txt = get(url); print('==', url, st); print(txt[:500])
           PY
