@@ -4,6 +4,24 @@ import { renderChart } from './chart.js';
 const STORAGE_KEY = 'dca-tracker-plans-v2';
 const SELECTED_KEY = 'dca-tracker-selected-plan';
 const LEGACY_KEY = 'dca-tracker-plans-v1';
+// 多位投資人：各自的投資項目與投入紀錄分開儲存。第 1 位沿用原本的儲存位置，舊資料歸給第 1 位。
+const PEOPLE_KEY = 'dca-tracker-people';
+const PEOPLE_COUNT = 3;
+const people = loadPeople();
+const planKey = () => (people.current === 0 ? STORAGE_KEY : `${STORAGE_KEY}-person${people.current + 1}`);
+const selectedKey = () => (people.current === 0 ? SELECTED_KEY : `${SELECTED_KEY}-person${people.current + 1}`);
+function loadPeople() {
+  const defaults = Array.from({ length: PEOPLE_COUNT }, (_, i) => `人名${i + 1}`);
+  try {
+    const saved = JSON.parse(localStorage.getItem(PEOPLE_KEY));
+    const names = defaults.map((d, i) => (typeof saved?.names?.[i] === 'string' && saved.names[i].trim()) || d);
+    const current = Number.isInteger(saved?.current) && saved.current >= 0 && saved.current < PEOPLE_COUNT ? saved.current : 0;
+    return { names, current };
+  } catch { return { names: defaults, current: 0 }; }
+}
+function savePeople() {
+  try { localStorage.setItem(PEOPLE_KEY, JSON.stringify(people)); } catch { /* 忽略 */ }
+}
 const DATA_URL = './data/prices.json';
 const QUOTES_URL = './data/quotes.json';
 const DEFAULT_PLANS = [
@@ -35,7 +53,7 @@ const results = [];
 // 讀取設定與投入紀錄；舊版（定期定額）只沿用基本設定，不沿用自動扣款。
 function loadPlans() {
   const read = key => { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } };
-  const saved = read(STORAGE_KEY) || read(LEGACY_KEY);
+  const saved = read(planKey()) || (people.current === 0 ? read(LEGACY_KEY) : null);
   if (Array.isArray(saved) && saved.length) {
     return saved.filter(p => p && typeof p.symbol === 'string').map((p, i) => {
       const custom = Boolean(p.custom) && !ASSETS[p.symbol];
@@ -49,10 +67,11 @@ function loadPlans() {
       return plan;
     });
   }
-  return DEFAULT_PLANS.map(p => ({ ...p, entries: [] }));
+  // 第 2、3 位投資人從空白開始（不帶範例原始投入）
+  return DEFAULT_PLANS.map(p => ({ ...p, ...(people.current === 0 ? {} : { initial: 0 }), entries: [] }));
 }
 function savePlans() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(plans)); } catch { /* 忽略 */ }
+  try { localStorage.setItem(planKey(), JSON.stringify(plans)); } catch { /* 忽略 */ }
 }
 
 function text(tag, value, className = '') {
@@ -132,18 +151,18 @@ function buildPlans(selected) {
 function refreshPlanSelect(selected) {
   const select = $('#plan-select');
   if (selected === undefined) {
-    try { selected = Number(localStorage.getItem(SELECTED_KEY)) || 0; } catch { selected = 0; }
+    try { selected = Number(localStorage.getItem(selectedKey())) || 0; } catch { selected = 0; }
   }
   if (!(selected >= 0 && selected < plans.length)) selected = 0;
   select.replaceChildren(...plans.map((_, i) => new Option('', String(i))));
   updatePlanOptions();
   select.value = String(selected);
   showPlan(selected);
-  try { localStorage.setItem(SELECTED_KEY, String(selected)); } catch { /* 忽略 */ }
+  try { localStorage.setItem(selectedKey(), String(selected)); } catch { /* 忽略 */ }
 }
 $('#plan-select').addEventListener('change', () => {
   showPlan(Number($('#plan-select').value));
-  try { localStorage.setItem(SELECTED_KEY, $('#plan-select').value); } catch { /* 忽略 */ }
+  try { localStorage.setItem(selectedKey(), $('#plan-select').value); } catch { /* 忽略 */ }
 });
 
 // ---------- 新增、刪除投資項目（台股） ----------
@@ -570,6 +589,46 @@ async function loadPrices() {
   }
 }
 
+// ---------- 投資人切換與改名 ----------
+function renderPeople() {
+  const group = $('#person-tabs');
+  group.replaceChildren(...people.names.map((name, i) => {
+    const button = text('button', name);
+    button.type = 'button';
+    button.setAttribute('aria-pressed', String(i === people.current));
+    button.addEventListener('click', () => switchPerson(i));
+    return button;
+  }));
+  $('#summary-title').textContent = `投資組合總覽・${people.names[people.current]}`;
+  $('#person-rename').textContent = `修改「${people.names[people.current]}」名稱`;
+}
+function switchPerson(index) {
+  if (index === people.current) return;
+  people.current = index;
+  savePeople();
+  plans = loadPlans();
+  results.length = 0;
+  $('#item-message').textContent = '';
+  renderPeople();
+  buildPlans();
+  render();
+}
+$('#person-rename').addEventListener('click', () => {
+  const current = people.names[people.current];
+  const input = window.prompt('請輸入新的名稱（最多 10 個字）', current);
+  if (input === null) return;
+  const name = input.trim().slice(0, 10);
+  const message = $('#person-message');
+  if (!name) { message.className = 'error'; message.textContent = '名稱不可空白。'; return; }
+  if (people.names.some((n, i) => i !== people.current && n === name)) { message.className = 'error'; message.textContent = `「${name}」已經使用，請換一個名稱。`; return; }
+  people.names[people.current] = name;
+  savePeople();
+  message.className = 'hint';
+  message.textContent = `已將「${current}」改名為「${name}」。`;
+  renderPeople();
+});
+
+renderPeople();
 buildPlans();
 render();
 loadPrices();

@@ -26,6 +26,15 @@
     </header>
     <div class="page" id="page-dca" data-page="dca" role="tabpanel" aria-label="定期定額">
       <p class="page-intro">設定原始投入後，每月手動輸入當月投入金額並送出，依網路股價自動累積計算庫存、市值與獲利（新台幣）。</p>
+      <section class="panel person-picker" aria-labelledby="person-title">
+        <h2 id="person-title" class="visually-hidden">投資人</h2>
+        <div id="person-tabs" class="segmented person-tabs" role="group" aria-label="選擇投資人"></div>
+        <div class="person-actions">
+          <button type="button" id="person-rename" class="link-button">修改名稱</button>
+          <p class="hint">每個人的投資項目與投入紀錄分開儲存，切換後下方只顯示該人的投資組合。</p>
+        </div>
+        <p id="person-message" class="hint" role="status" aria-live="polite"></p>
+      </section>
       <section class="panel" aria-labelledby="summary-title">
         <h2 id="summary-title">投資組合總覽</h2>
         <div id="summary" class="tiles"></div>
