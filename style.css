@@ -157,6 +157,11 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .watch-item { border-top: 1px solid var(--border); padding: 10px 0; }
 .watch-row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
 .watch-score { font-weight: 800; font-variant-numeric: tabular-nums; }
+.person-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+.person-actions .link-button { margin-left: 0; }
+.person-tabs button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.person-actions { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-top: 10px; }
+.person-actions .hint { margin: 0; }
 .watch-actions { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .watch-add { font: inherit; font-size: .85rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--accent); background: var(--surface); color: var(--accent); cursor: pointer; white-space: nowrap; }
 .watch-add:hover:not(:disabled) { background: var(--accent); color: #fff; }
