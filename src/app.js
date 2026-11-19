@@ -1,5 +1,6 @@
 import { ASSETS, FX_SYMBOL, MARKET_DEFAULTS, simulate, combineTimelines, syntheticSeries } from './dca.js';
 import { renderChart } from './chart.js';
+import { buildBackup, parseBackup, restoreBackup, backupFileName } from './backup.js';
 
 const STORAGE_KEY = 'dca-tracker-plans-v2';
 const SELECTED_KEY = 'dca-tracker-selected-plan';
@@ -8,16 +9,17 @@ const LEGACY_KEY = 'dca-tracker-plans-v1';
 const PEOPLE_KEY = 'dca-tracker-people';
 const PEOPLE_COUNT = 3;
 const people = loadPeople();
-const planKey = () => (people.current === 0 ? STORAGE_KEY : `${STORAGE_KEY}-person${people.current + 1}`);
-const selectedKey = () => (people.current === 0 ? SELECTED_KEY : `${SELECTED_KEY}-person${people.current + 1}`);
+const planKey = (person = people.current) => (person === 0 ? STORAGE_KEY : `${STORAGE_KEY}-person${person + 1}`);
+const selectedKey = (person = people.current) => (person === 0 ? SELECTED_KEY : `${SELECTED_KEY}-person${person + 1}`);
 function loadPeople() {
   const defaults = Array.from({ length: PEOPLE_COUNT }, (_, i) => `人名${i + 1}`);
   try {
     const saved = JSON.parse(localStorage.getItem(PEOPLE_KEY));
     const names = defaults.map((d, i) => (typeof saved?.names?.[i] === 'string' && saved.names[i].trim()) || d);
     const current = Number.isInteger(saved?.current) && saved.current >= 0 && saved.current < PEOPLE_COUNT ? saved.current : 0;
-    return { names, current };
-  } catch { return { names: defaults, current: 0 }; }
+    // family：顯示「全家合計」（current 仍記住最後選擇的個人）
+    return { names, current, family: saved?.family === true };
+  } catch { return { names: defaults, current: 0, family: false }; }
 }
 function savePeople() {
   try { localStorage.setItem(PEOPLE_KEY, JSON.stringify(people)); } catch { /* 忽略 */ }
@@ -51,9 +53,9 @@ let plans = loadPlans();
 const results = [];
 
 // 讀取設定與投入紀錄；舊版（定期定額）只沿用基本設定，不沿用自動扣款。
-function loadPlans() {
+function loadPlans(person = people.current) {
   const read = key => { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } };
-  const saved = read(planKey()) || (people.current === 0 ? read(LEGACY_KEY) : null);
+  const saved = read(planKey(person)) || (person === 0 ? read(LEGACY_KEY) : null);
   if (Array.isArray(saved) && saved.length) {
     return saved.filter(p => p && typeof p.symbol === 'string').map((p, i) => {
       const custom = Boolean(p.custom) && !ASSETS[p.symbol];
@@ -68,7 +70,7 @@ function loadPlans() {
     });
   }
   // 第 2、3 位投資人從空白開始（不帶範例原始投入）
-  return DEFAULT_PLANS.map(p => ({ ...p, ...(people.current === 0 ? {} : { initial: 0 }), entries: [] }));
+  return DEFAULT_PLANS.map(p => ({ ...p, ...(person === 0 ? {} : { initial: 0 }), entries: [] }));
 }
 function savePlans() {
   try { localStorage.setItem(planKey(), JSON.stringify(plans)); } catch { /* 忽略 */ }
@@ -470,8 +472,7 @@ function renderPlan(index) {
   }
 }
 
-function renderSummary() {
-  const done = results.filter(Boolean);
+function renderSummary(done = results.filter(Boolean)) {
   const summary = $('#summary');
   if (!done.length) {
     summary.replaceChildren(text('p', prices ? '尚無可計算的方案。' : '等待股價資料…', 'hint'));
@@ -496,8 +497,41 @@ function renderSummary() {
 }
 
 function render() {
+  if (people.family) { renderFamily(); return; }
   plans.forEach((_, i) => renderPlan(i));
   renderSummary();
+}
+
+// 全家合計：讀取三位投資人的紀錄分別試算，總覽為全部加總，下方列出每個人的小計。
+function renderFamily() {
+  const groups = prices ? people.names.map((name, person) => ({
+    name,
+    results: loadPlans(person).map(plan => {
+      try {
+        const asset = assetOf(plan);
+        return simulate(plan, seriesFor(plan, asset), prices.symbols[FX_SYMBOL], asset);
+      } catch { return null; }
+    }).filter(Boolean),
+  })) : [];
+  renderSummary(groups.flatMap(g => g.results));
+  const familyTable = $('#family-table');
+  if (!groups.length) { familyTable.replaceChildren(); return; }
+  const totals = groups.map(g => {
+    const invested = g.results.reduce((s, r) => s + r.investedTWD, 0);
+    const total = g.results.reduce((s, r) => s + r.totalTWD, 0);
+    return { name: g.name, invested, total };
+  });
+  const all = { name: '全家合計', invested: totals.reduce((s, t) => s + t.invested, 0), total: totals.reduce((s, t) => s + t.total, 0) };
+  table(familyTable, ['投資人', '累計投入', '資產總值', '總損益', '報酬率'], [...totals, all].map(t => {
+    const profit = t.total - t.invested;
+    return [t.name, format.money(t.invested), format.money(t.total), format.signed(profit), format.percent(t.invested ? profit / t.invested : 0)];
+  }));
+  familyTable.querySelectorAll('tbody tr').forEach((tr, i) => {
+    tr.dataset.person = i < totals.length ? String(i) : 'family';
+    const t = [...totals, all][i];
+    const tn = tone(t.total - t.invested);
+    if (tn) [3, 4].forEach(c => tr.children[c].classList.add(tn));
+  });
 }
 
 // 最新行情卡片：每張可點開來源網站查看最新報價。
@@ -592,27 +626,101 @@ async function loadPrices() {
 // ---------- 投資人切換與改名 ----------
 function renderPeople() {
   const group = $('#person-tabs');
-  group.replaceChildren(...people.names.map((name, i) => {
+  const tab = (name, key, pressed) => {
     const button = text('button', name);
     button.type = 'button';
-    button.setAttribute('aria-pressed', String(i === people.current));
-    button.addEventListener('click', () => switchPerson(i));
+    button.dataset.person = String(key);
+    button.setAttribute('aria-pressed', String(pressed));
+    button.addEventListener('click', () => switchPerson(key));
     return button;
-  }));
-  $('#summary-title').textContent = `投資組合總覽・${people.names[people.current]}`;
-  $('#person-rename').textContent = `修改「${people.names[people.current]}」名稱`;
+  };
+  group.replaceChildren(...people.names.map((name, i) => tab(name, i, !people.family && i === people.current)),
+    tab('全家', 'family', people.family));
+  const name = people.family ? '全家合計' : people.names[people.current];
+  // 每位投資人有自己的代表色（CSS 依 data-person 設定）
+  $('#page-dca').dataset.person = people.family ? 'family' : String(people.current);
+  $('#summary-title').textContent = `投資組合總覽・${name}`;
+  $('#person-rename').textContent = `修改「${name}」名稱`;
+  $('#person-rename').hidden = people.family;
+  $('#person-hint').textContent = people.family
+    ? '全家合計為三個人的投資組合加總，只能查看；要輸入或修改紀錄請點選個人。'
+    : '每個人的投資項目與投入紀錄分開儲存，切換後下方只顯示該人的投資組合。';
+  $('#family-breakdown').hidden = !people.family;
+  document.querySelectorAll('.person-only').forEach(node => { node.hidden = people.family; });
 }
-function switchPerson(index) {
-  if (index === people.current) return;
-  people.current = index;
+function switchPerson(key) {
+  $('#person-message').textContent = '';
+  if (key === 'family') {
+    if (people.family) return;
+    people.family = true;
+    savePeople();
+    renderPeople();
+    render();
+    return;
+  }
+  const changed = key !== people.current;
+  if (!changed && !people.family) return;
+  people.family = false;
+  people.current = key;
   savePeople();
-  plans = loadPlans();
-  results.length = 0;
-  $('#item-message').textContent = '';
   renderPeople();
-  buildPlans();
+  if (changed) {
+    plans = loadPlans();
+    results.length = 0;
+    $('#item-message').textContent = '';
+    buildPlans();
+  }
   render();
 }
+
+// ---------- 資料備份與還原 ----------
+function backupMessage(text, error = false) {
+  const message = $('#backup-message');
+  message.className = error ? 'error' : 'hint';
+  message.textContent = text;
+}
+$('#backup-export').addEventListener('click', async () => {
+  let backup;
+  try { backup = buildBackup(localStorage); } catch { backupMessage('無法讀取這台裝置的紀錄（可能是無痕模式）。', true); return; }
+  const name = backupFileName();
+  const file = new File([JSON.stringify(backup)], name, { type: 'application/json' });
+  // 手機優先用分享選單（可存到「檔案」、雲端硬碟或傳到 LINE）；電腦直接下載
+  if (window.matchMedia('(pointer: coarse)').matches && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: name });
+      backupMessage(`已匯出備份「${name}」，請妥善保存。`);
+      return;
+    } catch (error) {
+      if (error.name === 'AbortError') { backupMessage('已取消匯出。'); return; }
+    }
+  }
+  const url = URL.createObjectURL(file);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  backupMessage(`已下載備份「${name}」，請存到雲端硬碟或傳給自己保存。`);
+});
+$('#backup-import').addEventListener('click', () => $('#backup-file').click());
+$('#backup-file').addEventListener('change', async event => {
+  const input = event.target;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  let parsed;
+  try { parsed = parseBackup(await file.text()); } catch (error) { backupMessage(error.message, true); return; }
+  const when = parsed.exportedAt ? new Date(parsed.exportedAt).toLocaleString('zh-TW', { hour12: false }) : '不明時間';
+  if (!window.confirm(`要匯入 ${when} 的備份嗎？\n這台裝置目前的所有紀錄（三個人的投資組合、名稱與自選清單）都會被備份內容取代。`)) {
+    backupMessage('已取消匯入。');
+    return;
+  }
+  try { restoreBackup(localStorage, parsed.entries); } catch { backupMessage('無法寫入紀錄（可能是無痕模式或空間不足）。', true); return; }
+  backupMessage('匯入完成，重新載入中…');
+  window.location.reload();
+});
 $('#person-rename').addEventListener('click', () => {
   const current = people.names[people.current];
   const input = window.prompt('請輸入新的名稱（最多 10 個字）', current);
@@ -634,4 +742,7 @@ render();
 loadPrices();
 $('#reload-button').addEventListener('click', loadPrices);
 let resizeTimer;
-window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderSummary, 150); });
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => (people.family ? renderFamily() : renderSummary()), 150);
+});

@@ -157,7 +157,30 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 .watch-item { border-top: 1px solid var(--border); padding: 10px 0; }
 .watch-row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
 .watch-score { font-weight: 800; font-variant-numeric: tabular-nums; }
-.person-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+/* 每位投資人的代表色：人名1 玫瑰紅、人名2 藍、人名3 綠、全家合計 沿用主色 */
+:root { --person-1: #c2416b; --person-2: #2563c9; --person-3: #2f8a4c; --person-family: var(--accent); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --person-1: #f08aa6; --person-2: #7aa7f0; --person-3: #6cc58a; }
+}
+:root[data-theme="dark"] { --person-1: #f08aa6; --person-2: #7aa7f0; --person-3: #6cc58a; }
+[data-person="0"] { --person: var(--person-1); }
+[data-person="1"] { --person: var(--person-2); }
+[data-person="2"] { --person: var(--person-3); }
+[data-person="family"] { --person: var(--person-family); }
+.person-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0; }
+.person-tabs button { padding: 6px 4px; color: var(--person); border-color: var(--person); }
+.person-tabs button[aria-pressed="true"] { color: #fff; background: var(--person); border-color: var(--person); }
+#page-dca .person-picker { border-top: 5px solid var(--person); }
+#summary-title { color: var(--person); }
+.family-breakdown { margin-top: 16px; }
+.family-table td:first-child { font-weight: 700; color: var(--person); }
+.family-table tbody tr:last-child td { font-weight: 800; border-top: 2px solid var(--border); }
+.family-table td.up { color: var(--up); }
+.family-table td.down { color: var(--down); }
+.backup-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.secondary-button { background: var(--surface); color: var(--accent); border-color: var(--accent); }
+.brand { display: inline-flex; align-items: center; gap: 10px; }
+.brand-photo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
 .person-actions .link-button { margin-left: 0; }
 .person-tabs button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .person-actions { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-top: 10px; }
